@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-// Configure music
+// Music config
 const MUSIC_ID = 'XXswgVBbTjU';
-const MUSIC_START = 200;
+const MUSIC_START = 200; // 3:20
+const MUSIC_END = 243;   // 4:03
+const MUSIC_DURATION_MS = (MUSIC_END - MUSIC_START) * 1000;
 
 const BOOT_LOG = [
   'FRIDAY OS v2.0 - INITIALISING...',
@@ -70,7 +72,6 @@ function HeatmapPanel() {
 export default function BootSequence({ onComplete }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
-  const phaseRef = useRef(0);
   const audioContextRef = useRef(null);
 
   const [phase, setPhase] = useState(0);
@@ -80,7 +81,9 @@ export default function BootSequence({ onComplete }) {
   const [briefing, setBriefing] = useState('');
   const [showData, setShowData] = useState(false);
   const [briefingDone, setBriefingDone] = useState(false);
+  const [musicFinished, setMusicFinished] = useState(false);
 
+  // Load data on mount
   useEffect(() => {
     let cancelled = false;
 
@@ -99,8 +102,7 @@ export default function BootSequence({ onComplete }) {
         const r = await fetch('/api/news');
         const d = await r.json();
         if (!cancelled) {
-          const headlines = Array.isArray(d?.headlines) ? d.headlines : [];
-          setNews(headlines);
+          setNews(Array.isArray(d?.headlines) ? d.headlines : []);
         }
       } catch (_) {
         if (!cancelled) setNews([]);
@@ -128,6 +130,51 @@ export default function BootSequence({ onComplete }) {
     };
   }, []);
 
+  // Boot log stream
+  useEffect(() => {
+    let i = 0;
+    let timeoutId = null;
+
+    const tick = () => {
+      if (i < BOOT_LOG.length) {
+        setLogLines((prev) => [...prev, BOOT_LOG[i]]);
+        i += 1;
+        timeoutId = window.setTimeout(tick, 350 + Math.random() * 200);
+      }
+    };
+
+    timeoutId = window.setTimeout(tick, 1200);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, []);
+
+  // Phase timing
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setPhase(1), 800),
+      setTimeout(() => setPhase(2), 2500),
+      setTimeout(() => setPhase(3), 5000),
+      setTimeout(() => {
+        setPhase(4);
+        setShowData(true);
+      }, 8000),
+    ];
+
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  // Music finishes automatically after 3:20 -> 4:03
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setMusicFinished(true);
+    }, MUSIC_DURATION_MS + 300);
+
+    return () => clearTimeout(t);
+  }, []);
+
+  // Speak briefing only after music finishes and phase 4 is reached
   const speak = useCallback(async (text) => {
     if (typeof text !== 'string' || !text.trim()) {
       setBriefingDone(true);
@@ -167,9 +214,7 @@ export default function BootSequence({ onComplete }) {
         setBriefingDone(true);
         try {
           await ac.close();
-        } catch (_) {
-          // ignore
-        }
+        } catch (_) {}
       };
     } catch (_) {
       setBriefingDone(true);
@@ -177,94 +222,42 @@ export default function BootSequence({ onComplete }) {
   }, []);
 
   useEffect(() => {
-    let i = 0;
-    let timeoutId = null;
-
-    const tick = () => {
-      if (i < BOOT_LOG.length) {
-        setLogLines((prev) => [...prev, BOOT_LOG[i]]);
-        i += 1;
-        timeoutId = window.setTimeout(tick, 350 + Math.random() * 200);
-      }
-    };
-
-    timeoutId = window.setTimeout(tick, 1200);
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, []);
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => {
-        phaseRef.current = 1;
-        setPhase(1);
-      }, 800),
-      setTimeout(() => {
-        phaseRef.current = 2;
-        setPhase(2);
-      }, 2500),
-      setTimeout(() => {
-        phaseRef.current = 3;
-        setPhase(3);
-      }, 5000),
-      setTimeout(() => {
-        phaseRef.current = 4;
-        setPhase(4);
-        setShowData(true);
-      }, 8000),
-    ];
-
-    return () => timers.forEach(clearTimeout);
-  }, []);
-
-  useEffect(() => {
-    if (phase < 4) return;
+    if (phase < 4 || !musicFinished) return;
 
     if (typeof briefing !== 'string' || !briefing.trim()) {
       const fallback = setTimeout(() => {
         setBriefingDone(true);
-      }, 2500);
-
+      }, 1500);
       return () => clearTimeout(fallback);
     }
 
     const t = setTimeout(() => {
       speak(briefing);
-    }, 1000);
+    }, 700);
 
     return () => clearTimeout(t);
-  }, [phase, briefing, speak]);
+  }, [phase, musicFinished, briefing, speak]);
 
+  // Complete after briefing finishes
   useEffect(() => {
     if (briefingDone && phase >= 4) {
       const t = setTimeout(() => {
         onComplete();
       }, 1500);
-
       return () => clearTimeout(t);
     }
   }, [briefingDone, phase, onComplete]);
 
+  // Absolute safety fallback
   useEffect(() => {
     const t = setTimeout(() => {
       setBriefingDone(true);
-    }, 12000);
+    }, 20000);
 
     return () => clearTimeout(t);
   }, []);
 
-  useEffect(() => {
-    const hardStop = setTimeout(() => {
-      if (phaseRef.current >= 4) {
-        setBriefingDone(true);
-      }
-    }, 14000);
-
-    return () => clearTimeout(hardStop);
-  }, []);
-
+  // Canvas animation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -285,18 +278,17 @@ export default function BootSequence({ onComplete }) {
 
     const draw = () => {
       t += 1;
-      const ph = phaseRef.current;
       const cx = w / 2;
       const cy = h / 2;
 
-      ctx.fillStyle = ph < 2 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,10,0.12)';
+      ctx.fillStyle = phase < 2 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,10,0.12)';
       ctx.fillRect(0, 0, w, h);
 
-      if (ph >= 1) {
+      if (phase >= 1) {
         const HEX = 34;
         const cols = Math.ceil(w / (HEX * 1.5)) + 2;
         const rows = Math.ceil(h / (HEX * 1.732)) + 2;
-        const gridAlpha = Math.min(1, (ph - 1) * 0.4) * 0.06;
+        const gridAlpha = Math.min(1, (phase - 1) * 0.4) * 0.06;
 
         for (let col = -1; col < cols; col += 1) {
           for (let row = -1; row < rows; row += 1) {
@@ -313,7 +305,6 @@ export default function BootSequence({ onComplete }) {
               const ang = (k * Math.PI) / 3;
               const hx = px + HEX * 0.85 * Math.cos(ang);
               const hy = py + HEX * 0.85 * Math.sin(ang);
-
               if (k === 0) ctx.moveTo(hx, hy);
               else ctx.lineTo(hx, hy);
             }
@@ -324,7 +315,7 @@ export default function BootSequence({ onComplete }) {
         }
       }
 
-      if (ph >= 2) {
+      if (phase >= 2) {
         for (let i = 0; i < 8; i += 1) {
           const r = 60 + i * 90 + (t % 200) * 1.5;
           const alp = Math.max(0, 0.15 - r / 1200);
@@ -336,7 +327,7 @@ export default function BootSequence({ onComplete }) {
         }
       }
 
-      if (ph >= 3) {
+      if (phase >= 3) {
         const nodeCount = 8;
         const orbitR = 180;
 
@@ -385,14 +376,14 @@ export default function BootSequence({ onComplete }) {
         ctx.stroke();
       });
 
-      if (ph >= 1) {
-        ctx.font = `300 ${ph >= 2 ? '36' : '48'}px monospace`;
+      if (phase >= 1) {
+        ctx.font = `300 ${phase >= 2 ? '36' : '48'}px monospace`;
         ctx.fillStyle = 'rgba(0,200,255,1)';
         ctx.shadowColor = '#00b4ff';
         ctx.shadowBlur = 30;
         ctx.textAlign = 'center';
 
-        const yPos = ph >= 3 ? 60 : cy - 20;
+        const yPos = phase >= 3 ? 60 : cy - 20;
         ctx.fillText('FRIDAY', cx, yPos);
 
         ctx.shadowBlur = 0;
@@ -423,16 +414,14 @@ export default function BootSequence({ onComplete }) {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, []);
+  }, [phase]);
 
   useEffect(() => {
     return () => {
       if (audioContextRef.current) {
         try {
           audioContextRef.current.close();
-        } catch (_) {
-          // ignore
-        }
+        } catch (_) {}
       }
     };
   }, []);
@@ -464,7 +453,7 @@ export default function BootSequence({ onComplete }) {
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
 
       <iframe
-        src={`https://www.youtube.com/embed/${MUSIC_ID}?autoplay=1&start=${MUSIC_START}&loop=1&playlist=${MUSIC_ID}`}
+        src={`https://www.youtube.com/embed/${MUSIC_ID}?autoplay=1&start=${MUSIC_START}&end=${MUSIC_END}&controls=0&modestbranding=1&rel=0`}
         allow="autoplay"
         style={{
           position: 'absolute',
@@ -537,10 +526,7 @@ export default function BootSequence({ onComplete }) {
             {weather ? (
               <div>
                 <div style={{ fontSize: 32, fontWeight: 100 }}>
-                  {typeof weather?.temp === 'number' || typeof weather?.temp === 'string'
-                    ? weather.temp
-                    : '--'}
-                  °C
+                  {typeof weather?.temp === 'number' || typeof weather?.temp === 'string' ? weather.temp : '--'}°C
                 </div>
                 <div style={{ fontSize: 11, marginTop: 4, color: '#00eaff' }}>
                   {wmoDesc[weather?.code] || weather?.desc || 'Unavailable'}
@@ -627,7 +613,11 @@ export default function BootSequence({ onComplete }) {
               whiteSpace: 'nowrap',
             }}
           >
-            {briefingDone ? 'BRIEFING COMPLETE LAUNCHING FRIDAY' : 'DELIVERING MORNING BRIEFING...'}
+            {briefingDone
+              ? 'BRIEFING COMPLETE LAUNCHING FRIDAY'
+              : musicFinished
+                ? 'DELIVERING MORNING BRIEFING...'
+                : 'INITIALISING CINEMATIC INTRO...'}
           </div>
         </div>
       )}
