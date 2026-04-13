@@ -21,6 +21,17 @@ export async function GET(){
   const [weather,headlines]=await Promise.all([getWeather(),getNews()]);
   const now=new Date().toLocaleString('en-AU',{timeZone:'Australia/Melbourne',weekday:'long',hour:'2-digit',minute:'2-digit'});
   const prompt=`You are FRIDAY, Ben Lynch's personal AI. Deliver his morning briefing. Max 90 words. Sharp, punchy, Aussie tone. No lists. Include: time of day, Melbourne weather, weave in 2 top global headlines naturally, close with one sharp coaching focus for the D2MS HelloFresh sales floor today.\n\nTime: ${now}\nWeather: Melbourne, ${weather}\nHeadlines: ${headlines.join(' | ')}`;
-  const briefing=await askFriday(prompt,'bob');
-  return Response.json({briefing,weather,headlines,time:now});
+  const { reply, mock } = await askFriday({
+    userMessage: prompt,
+    module: 'bob',
+    maxTokens: 220
+  });
+
+  return Response.json({
+    briefing: reply || '',
+    mock,
+    weather,
+    headlines,
+    time: now
+  });
 }

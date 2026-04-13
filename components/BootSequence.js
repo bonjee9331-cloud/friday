@@ -23,20 +23,23 @@ const BOOT_LOG = [
   'GOOD MORNING, BEN.',
 ];
 
+const HEATMAP_ROWS = 10;
+const HEATMAP_COLS = 18;
+
 function HeatmapPanel() {
-  const [cells, setCells] = require('react').useState(() => {
-    const rows = 10, cols = 18;
-    return Array.from({length: rows * cols}, () => {
+  const [cells] = useState(() => {
+    return Array.from({ length: HEATMAP_ROWS * HEATMAP_COLS }, () => {
       const v = Math.random();
       const r = Math.round(255 * Math.min(1, v * 2));
       const g = Math.round(255 * Math.min(1, (1 - v) * 2));
       return { r, g, v };
     });
   });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       <div style={{ fontSize: 9, letterSpacing: 3, color: '#00b4ff', marginBottom: 6 }}>GLOBAL ACTIVITY HEATMAP</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + cols + ', 1fr)', gap: 2 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(' + HEATMAP_COLS + ', 1fr)', gap: 2 }}>
         {cells.map((c, i) => (
           <div key={i} style={{
             width: 14, height: 10, borderRadius: 1,
@@ -120,10 +123,15 @@ export default function BootSequence({ onComplete }) {
 
   // speak briefing once data arrives and we're in phase 4
   useEffect(() => {
-    if (phase >= 4 && briefing) {
-      const t = setTimeout(() => speak(briefing), 1000);
-      return () => clearTimeout(t);
+    if (phase < 4) return;
+
+    if (!briefing) {
+      const fallback = setTimeout(() => setBriefingDone(true), 2500);
+      return () => clearTimeout(fallback);
     }
+
+    const t = setTimeout(() => speak(briefing), 1000);
+    return () => clearTimeout(t);
   }, [phase, briefing, speak]);
 
   // complete after briefing done + minimum time
@@ -133,6 +141,12 @@ export default function BootSequence({ onComplete }) {
       return () => clearTimeout(t);
     }
   }, [briefingDone, phase, onComplete]);
+
+  // hard safety fallback so the loader cannot hang forever
+  useEffect(() => {
+    const t = setTimeout(() => setBriefingDone(true), 12000);
+    return () => clearTimeout(t);
+  }, []);
 
   // canvas animation
   useEffect(() => {
