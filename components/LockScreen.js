@@ -30,7 +30,7 @@ export default function LockScreen({ onUnlock }) {
 
   const armMic = useCallback(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (\!SR) { setStatus('MIC NOT SUPPORTED — TYPE PASSPHRASE BELOW'); return; }
+    if (!SR) { setStatus('MIC NOT SUPPORTED — TYPE PASSPHRASE BELOW'); return; }
     const rec = new SR();
     rec.continuous     = true;
     rec.interimResults = true;
@@ -42,7 +42,7 @@ export default function LockScreen({ onUnlock }) {
       setHeard(t.slice(-60));
       checkPhrase(t);
     };
-    rec.onend = () => { if (\!unlocking) { try { rec.start(); } catch(e){} } };
+    rec.onend = () => { if (!unlocking) { try { rec.start(); } catch(e){} } };
     recRef.current = rec;
     try { rec.start(); } catch(e) { setStatus('MIC ERROR — TYPE BELOW'); }
   }, [checkPhrase, unlocking]);
@@ -50,7 +50,7 @@ export default function LockScreen({ onUnlock }) {
   // canvas animation
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (\!canvas) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let t = 0;
     let w = canvas.width  = window.innerWidth;
@@ -151,7 +151,7 @@ export default function LockScreen({ onUnlock }) {
         </div>
 
         {/* last heard */}
-        {heard && \!unlocking && (
+        {heard && !unlocking && (
           <div style={{ fontSize:10, color:'rgba(0,180,255,0.5)', marginBottom:10, maxWidth:340, textAlign:'center', letterSpacing:1 }}>
             LAST HEARD: "{heard.slice(-50)}"
           </div>
@@ -172,7 +172,7 @@ export default function LockScreen({ onUnlock }) {
         </div>
 
         {/* ARM button */}
-        {\!armed && \!unlocking && (
+        {!armed && !unlocking && (
           <button onClick={armMic} style={{
             background:'rgba(0,180,255,0.12)',
             border:'1px solid rgba(0,180,255,0.6)',
@@ -187,7 +187,7 @@ export default function LockScreen({ onUnlock }) {
         )}
 
         {/* text fallback */}
-        {\!unlocking && (
+        {!unlocking && (
           <form onSubmit={e => { e.preventDefault(); checkPhrase(textInput); setTextInput(''); }}
             style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
             <div style={{ fontSize:9, letterSpacing:3, color:'rgba(0,180,255,0.35)', marginBottom:2 }}>OR TYPE PASSPHRASE</div>
