@@ -2,11 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-// Music config
 const MUSIC_ID = 'XXswgVBbTjU';
 const MUSIC_START = 200; // 3:20
 const MUSIC_END = 243;   // 4:03
-const MUSIC_DURATION_MS = (MUSIC_END - MUSIC_START) * 1000;
+const FADE_DURATION_MS = 2500;
 
 const BOOT_LOG = [
   'FRIDAY OS v2.0 - INITIALISING...',
@@ -73,6 +72,11 @@ export default function BootSequence({ onComplete }) {
   const canvasRef = useRef(null);
   const animRef = useRef(null);
   const audioContextRef = useRef(null);
+  const playerRef = useRef(null);
+  const fadeTimerRef = useRef(null);
+  const finishTimerRef = useRef(null);
+  const phaseRef = useRef(0);
+  const playerContainerIdRef = useRef(`yt-player-${Math.random().toString(36).slice(2)}`);
 
   const [phase, setPhase] = useState(0);
   const [logLines, setLogLines] = useState([]);
@@ -83,7 +87,6 @@ export default function BootSequence({ onComplete }) {
   const [briefingDone, setBriefingDone] = useState(false);
   const [musicFinished, setMusicFinished] = useState(false);
 
-  // Load data on mount
   useEffect(() => {
     let cancelled = false;
 
@@ -101,9 +104,7 @@ export default function BootSequence({ onComplete }) {
       try {
         const r = await fetch('/api/news');
         const d = await r.json();
-        if (!cancelled) {
-          setNews(Array.isArray(d?.headlines) ? d.headlines : []);
-        }
+        if (!cancelled) setNews(Array.isArray(d?.headlines) ? d.headlines : []);
       } catch (_) {
         if (!cancelled) setNews([]);
       }
@@ -113,9 +114,7 @@ export default function BootSequence({ onComplete }) {
       try {
         const r = await fetch('/api/briefing');
         const d = await r.json();
-        if (!cancelled) {
-          setBriefing(typeof d?.briefing === 'string' ? d.briefing : '');
-        }
+        if (!cancelled) setBriefing(typeof d?.briefing === 'string' ? d.briefing : '');
       } catch (_) {
         if (!cancelled) setBriefing('');
       }
@@ -130,7 +129,6 @@ export default function BootSequence({ onComplete }) {
     };
   }, []);
 
-  // Boot log stream
   useEffect(() => {
     let i = 0;
     let timeoutId = null;
@@ -150,13 +148,22 @@ export default function BootSequence({ onComplete }) {
     };
   }, []);
 
-  // Phase timing
   useEffect(() => {
     const timers = [
-      setTimeout(() => setPhase(1), 800),
-      setTimeout(() => setPhase(2), 2500),
-      setTimeout(() => setPhase(3), 5000),
       setTimeout(() => {
+        phaseRef.current = 1;
+        setPhase(1);
+      }, 800),
+      setTimeout(() => {
+        phaseRef.current = 2;
+        setPhase(2);
+      }, 2500),
+      setTimeout(() => {
+        phaseRef.current = 3;
+        setPhase(3);
+      }, 5000),
+      setTimeout(() => {
+        phaseRef.current = 4;
         setPhase(4);
         setShowData(true);
       }, 8000),
@@ -165,16 +172,127 @@ export default function BootSequence({ onComplete }) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  // Music finishes automatically after 3:20 -> 4:03
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setMusicFinished(true);
-    }, MUSIC_DURATION_MS + 300);
-
-    return () => clearTimeout(t);
+  const markMusicFinished = useCallback(() => {
+    setMusicFinished((prev) => prev || true);
   }, []);
 
-  // Speak briefing only after music finishes and phase 4 is reached
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let cancelled = false;
+
+    const setupPlayer = () => {
+      if (cancelled || playerRef.current || !window.YT || !window.YT.Player) return;
+
+      const container = document.getElementById(playerContainerIdRef.current);
+      if (!container) return;
+
+      playerRef.current = new window.YT.Player(playerContainerIdRef.current, {
+        height: '1',
+        width: '1',
+        videoId: MUSIC_ID,
+        playerVars: {
+          autoplay: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          rel: 0,
+          start: MUSIC_START,
+          end: MUSIC_END,
+        },
+        events: {
+          onReady: (event) => {
+            try {
+              event.target.setVolume(70);
+              event.target.playVideo();
+              event.target.seekTo(MUSIC_START, true);
+            } catch (_) {
+              markMusicFinished();
+              return;
+            }
+
+            const totalMs = (MUSIC_END - MUSIC_START) * 1000;
+            const fadeStartMs = Math.max(0, totalMs - FADE_DURATION_MS);
+
+            fadeTimerRef.current = window.setTimeout(() => {
+              let volume = 70;
+
+              const fadeStep = window.setInterval(() => {
+                volume -= 5;
+
+                try {
+                  if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
+                    playerRef.current.setVolume(Math.max(0, volume));
+                  }
+                } catch (_) {
+                  // ignore
+                }
+
+                if (volume <= 0) {
+                  clearInterval(fadeStep);
+                  try {
+                    if (playerRef.current && typeof playerRef.current.stopVideo === 'function') {
+                      playerRef.current.stopVideo();
+                    }
+                  } catch (_) {
+                    // ignore
+                  }
+                  markMusicFinished();
+                }
+              }, 180);
+            }, fadeStartMs);
+
+            finishTimerRef.current = window.setTimeout(() => {
+              try {
+                if (playerRef.current && typeof playerRef.current.stopVideo === 'function') {
+                  playerRef.current.stopVideo();
+                }
+              } catch (_) {
+                // ignore
+              }
+              markMusicFinished();
+            }, totalMs + 500);
+          },
+          onError: () => {
+            markMusicFinished();
+          },
+          onStateChange: (event) => {
+            if (event.data === 0) {
+              markMusicFinished();
+            }
+          },
+        },
+      });
+    };
+
+    if (window.YT && window.YT.Player) {
+      setupPlayer();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingScript = document.getElementById('youtube-iframe-api');
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.id = 'youtube-iframe-api';
+      script.src = 'https://www.youtube.com/iframe_api';
+      document.body.appendChild(script);
+    }
+
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      if (typeof previousReady === 'function') previousReady();
+      setupPlayer();
+    };
+
+    return () => {
+      cancelled = true;
+    };
+  }, [markMusicFinished]);
+
   const speak = useCallback(async (text) => {
     if (typeof text !== 'string' || !text.trim()) {
       setBriefingDone(true);
@@ -214,7 +332,9 @@ export default function BootSequence({ onComplete }) {
         setBriefingDone(true);
         try {
           await ac.close();
-        } catch (_) {}
+        } catch (_) {
+          // ignore
+        }
       };
     } catch (_) {
       setBriefingDone(true);
@@ -233,12 +353,11 @@ export default function BootSequence({ onComplete }) {
 
     const t = setTimeout(() => {
       speak(briefing);
-    }, 700);
+    }, 500);
 
     return () => clearTimeout(t);
   }, [phase, musicFinished, briefing, speak]);
 
-  // Complete after briefing finishes
   useEffect(() => {
     if (briefingDone && phase >= 4) {
       const t = setTimeout(() => {
@@ -248,16 +367,14 @@ export default function BootSequence({ onComplete }) {
     }
   }, [briefingDone, phase, onComplete]);
 
-  // Absolute safety fallback
   useEffect(() => {
-    const t = setTimeout(() => {
+    const hardStop = setTimeout(() => {
       setBriefingDone(true);
-    }, 20000);
+    }, 25000);
 
-    return () => clearTimeout(t);
+    return () => clearTimeout(hardStop);
   }, []);
 
-  // Canvas animation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -278,17 +395,18 @@ export default function BootSequence({ onComplete }) {
 
     const draw = () => {
       t += 1;
+      const ph = phaseRef.current;
       const cx = w / 2;
       const cy = h / 2;
 
-      ctx.fillStyle = phase < 2 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,10,0.12)';
+      ctx.fillStyle = ph < 2 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,10,0.12)';
       ctx.fillRect(0, 0, w, h);
 
-      if (phase >= 1) {
+      if (ph >= 1) {
         const HEX = 34;
         const cols = Math.ceil(w / (HEX * 1.5)) + 2;
         const rows = Math.ceil(h / (HEX * 1.732)) + 2;
-        const gridAlpha = Math.min(1, (phase - 1) * 0.4) * 0.06;
+        const gridAlpha = Math.min(1, (ph - 1) * 0.4) * 0.06;
 
         for (let col = -1; col < cols; col += 1) {
           for (let row = -1; row < rows; row += 1) {
@@ -315,7 +433,7 @@ export default function BootSequence({ onComplete }) {
         }
       }
 
-      if (phase >= 2) {
+      if (ph >= 2) {
         for (let i = 0; i < 8; i += 1) {
           const r = 60 + i * 90 + (t % 200) * 1.5;
           const alp = Math.max(0, 0.15 - r / 1200);
@@ -327,7 +445,7 @@ export default function BootSequence({ onComplete }) {
         }
       }
 
-      if (phase >= 3) {
+      if (ph >= 3) {
         const nodeCount = 8;
         const orbitR = 180;
 
@@ -376,14 +494,14 @@ export default function BootSequence({ onComplete }) {
         ctx.stroke();
       });
 
-      if (phase >= 1) {
-        ctx.font = `300 ${phase >= 2 ? '36' : '48'}px monospace`;
+      if (ph >= 1) {
+        ctx.font = `300 ${ph >= 2 ? '36' : '48'}px monospace`;
         ctx.fillStyle = 'rgba(0,200,255,1)';
         ctx.shadowColor = '#00b4ff';
         ctx.shadowBlur = 30;
         ctx.textAlign = 'center';
 
-        const yPos = phase >= 3 ? 60 : cy - 20;
+        const yPos = ph >= 3 ? 60 : cy - 20;
         ctx.fillText('FRIDAY', cx, yPos);
 
         ctx.shadowBlur = 0;
@@ -414,14 +532,27 @@ export default function BootSequence({ onComplete }) {
       if (animRef.current) cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, [phase]);
+  }, []);
 
   useEffect(() => {
     return () => {
+      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
+      if (finishTimerRef.current) clearTimeout(finishTimerRef.current);
+
+      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+        try {
+          playerRef.current.destroy();
+        } catch (_) {
+          // ignore
+        }
+      }
+
       if (audioContextRef.current) {
         try {
           audioContextRef.current.close();
-        } catch (_) {}
+        } catch (_) {
+          // ignore
+        }
       }
     };
   }, []);
@@ -451,10 +582,8 @@ export default function BootSequence({ onComplete }) {
       }}
     >
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
-
-      <iframe
-        src={`https://www.youtube.com/embed/${MUSIC_ID}?autoplay=1&start=${MUSIC_START}&end=${MUSIC_END}&controls=0&modestbranding=1&rel=0`}
-        allow="autoplay"
+      <div
+        id={playerContainerIdRef.current}
         style={{
           position: 'absolute',
           width: 1,
@@ -464,7 +593,6 @@ export default function BootSequence({ onComplete }) {
           left: 0,
           pointerEvents: 'none',
         }}
-        title="music"
       />
 
       <div
