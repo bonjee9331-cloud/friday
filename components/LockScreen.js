@@ -26,7 +26,7 @@ export default function LockScreen({ onUnlock }) {
   // speech recognition — continuous loop
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (\!SR) return;
+    if (!SR) return;
     const rec = new SR();
     rec.continuous = true;
     rec.interimResults = true;
@@ -36,7 +36,7 @@ export default function LockScreen({ onUnlock }) {
       const transcript = Array.from(e.results).map(r => r[0].transcript).join(' ');
       checkPhrase(transcript);
     };
-    rec.onend = () => { if (\!unlocking) { try { rec.start(); } catch(err){} } };
+    rec.onend = () => { if (!unlocking) { try { rec.start(); } catch(err){} } };
     try { rec.start(); } catch(err) {}
     recRef.current = rec;
     return () => { try { rec.stop(); } catch(err){} };
@@ -45,7 +45,7 @@ export default function LockScreen({ onUnlock }) {
   // canvas animation
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (\!canvas) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let t = 0;
     let w = canvas.width  = window.innerWidth;
@@ -206,7 +206,7 @@ export default function LockScreen({ onUnlock }) {
           ))}
         </div>
 
-        {\!showText && (
+        {!showText && (
           <button onClick={() => setShowText(true)} style={{
             background: 'none',
             border: '1px solid rgba(0,180,255,0.25)',

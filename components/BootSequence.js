@@ -70,14 +70,14 @@ export default function BootSequence({ onComplete }) {
 
   // speak via ElevenLabs
   const speak = useCallback(async (text) => {
-    if (\!text) return;
+    if (!text) return;
     try {
       const res = await fetch('/api/friday/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-      if (\!res.ok) throw new Error('voice fail');
+      if (!res.ok) throw new Error('voice fail');
       const buf = await res.arrayBuffer();
       const ac  = new AudioContext();
       const decoded = await ac.decodeAudioData(buf);
@@ -135,7 +135,7 @@ export default function BootSequence({ onComplete }) {
   // canvas animation
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (\!canvas) return;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
     let t = 0;
     let w = canvas.width  = window.innerWidth;
