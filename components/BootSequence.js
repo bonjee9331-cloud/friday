@@ -5,7 +5,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 const MUSIC_ID = 'XXswgVBbTjU';
 const MUSIC_START = 200;
 const MUSIC_END = 243;
+const MUSIC_DURATION_MS = (MUSIC_END - MUSIC_START) * 1000;
 const FADE_DURATION_MS = 2500;
+const START_VOLUME = 70;
 
 const BOOT_LOG = [
   'FRIDAY OS v2.0 - INITIALISING...',
@@ -34,6 +36,12 @@ export default function BootSequence({ onComplete }) {
   const playerContainerIdRef = useRef(`yt-player-${Math.random().toString(36).slice(2)}`);
   const phaseRef = useRef(0);
 
+  const fadeTimeoutRef = useRef(null);
+  const fadeIntervalRef = useRef(null);
+  const finishTimeoutRef = useRef(null);
+  const speakTimeoutRef = useRef(null);
+  const bootCompleteTimeoutRef = useRef(null);
+
   const [phase, setPhase] = useState(0);
   const [logLines, setLogLines] = useState([]);
   const [weather, setWeather] = useState(null);
@@ -42,6 +50,11 @@ export default function BootSequence({ onComplete }) {
   const [showData, setShowData] = useState(false);
   const [musicFinished, setMusicFinished] = useState(false);
   const [briefingDone, setBriefingDone] = useState(false);
+  const [voiceStarted, setVoiceStarted] = useState(false);
+
+  const markMusicFinished = useCallback(() => {
+    setMusicFinished((prev) => prev || true);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,17 +145,10 @@ export default function BootSequence({ onComplete }) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  const markMusicFinished = useCallback(() => {
-    setMusicFinished(true);
-  }, []);
-
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     let cancelled = false;
-    let fadeInterval = null;
-    let fadeTimeout = null;
-    let finishTimeout = null;
 
     const setupPlayer = () => {
       if (cancelled || playerRef.current || !window.YT || !window.YT.Player) return;
@@ -168,21 +174,20 @@ export default function BootSequence({ onComplete }) {
         events: {
           onReady: (event) => {
             try {
-              event.target.setVolume(70);
-              event.target.playVideo();
+              event.target.setVolume(START_VOLUME);
               event.target.seekTo(MUSIC_START, true);
+              event.target.playVideo();
             } catch (_) {
               markMusicFinished();
               return;
             }
 
-            const totalMs = (MUSIC_END - MUSIC_START) * 1000;
-            const fadeStartMs = Math.max(0, totalMs - FADE_DURATION_MS);
+            const fadeStartMs = Math.max(0, MUSIC_DURATION_MS - FADE_DURATION_MS);
 
-            fadeTimeout = window.setTimeout(() => {
-              let volume = 70;
+            fadeTimeoutRef.current = window.setTimeout(() => {
+              let volume = START_VOLUME;
 
-              fadeInterval = window.setInterval(() => {
+              fadeIntervalRef.current = window.setInterval(() => {
                 volume -= 5;
 
                 try {
@@ -194,7 +199,8 @@ export default function BootSequence({ onComplete }) {
                 }
 
                 if (volume <= 0) {
-                  if (fadeInterval) clearInterval(fadeInterval);
+                  if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+
                   try {
                     if (playerRef.current && typeof playerRef.current.stopVideo === 'function') {
                       playerRef.current.stopVideo();
@@ -202,12 +208,13 @@ export default function BootSequence({ onComplete }) {
                   } catch (_) {
                     // ignore
                   }
+
                   markMusicFinished();
                 }
               }, 180);
             }, fadeStartMs);
 
-            finishTimeout = window.setTimeout(() => {
+            finishTimeoutRef.current = window.setTimeout(() => {
               try {
                 if (playerRef.current && typeof playerRef.current.stopVideo === 'function') {
                   playerRef.current.stopVideo();
@@ -215,8 +222,9 @@ export default function BootSequence({ onComplete }) {
               } catch (_) {
                 // ignore
               }
+
               markMusicFinished();
-            }, totalMs + 500);
+            }, MUSIC_DURATION_MS + 600);
           },
           onError: () => {
             markMusicFinished();
@@ -250,98 +258,133 @@ export default function BootSequence({ onComplete }) {
 
     return () => {
       cancelled = true;
-      if (fadeTimeout) clearTimeout(fadeTimeout);
-      if (finishTimeout) clearTimeout(finishTimeout);
-      if (fadeInterval) clearInterval(fadeInterval);
-
-      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
-        try {
-          playerRef.current.destroy();
-        } catch (_) {
-          // ignore
-        }
-      }
     };
   }, [markMusicFinished]);
 
-  const speak = useCallback(async (text) => {
-    if (typeof text !== 'string' || !text.trim()) {
-      setBriefingDone(true);
-      return;
-    }
-
-    try {
-      const res = await fetch('/api/friday/voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!res.ok) {
-        setBriefingDone(true);
+  const speakWithBrowserVoice = useCallback((text) => {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined' || !window.speechSynthesis || typeof text !== 'string' || !text.trim()) {
+        resolve();
         return;
       }
 
-      const buf = await res.arrayBuffer();
-      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      try {
+        window.speechSynthesis.cancel();
 
-      if (!AudioContextClass) {
-        setBriefingDone(true);
-        return;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+
+        utterance.onend = () => resolve();
+        utterance.onerror = () => resolve();
+
+        const voices = window.speechSynthesis.getVoices();
+        const preferred =
+          voices.find((v) => /female|zira|susan|aria|samantha|karen/i.test(v.name)) ||
+          voices.find((v) => /en-au|en-gb|en-us/i.test(v.lang)) ||
+          null;
+
+        if (preferred) utterance.voice = preferred;
+
+        window.speechSynthesis.speak(utterance);
+      } catch (_) {
+        resolve();
       }
-
-      const ac = new AudioContextClass();
-      audioContextRef.current = ac;
-
-      const decoded = await ac.decodeAudioData(buf.slice(0));
-      const src = ac.createBufferSource();
-      src.buffer = decoded;
-      src.connect(ac.destination);
-      src.start(0);
-
-      src.onended = async () => {
-        setBriefingDone(true);
-        try {
-          await ac.close();
-        } catch (_) {
-          // ignore
-        }
-      };
-    } catch (_) {
-      setBriefingDone(true);
-    }
+    });
   }, []);
 
-  useEffect(() => {
-    if (phase < 4 || !musicFinished) return;
+  const speak = useCallback(
+    async (text) => {
+      if (voiceStarted) return;
 
-    if (typeof briefing !== 'string' || !briefing.trim()) {
-      const fallback = setTimeout(() => {
+      setVoiceStarted(true);
+
+      if (typeof text !== 'string' || !text.trim()) {
         setBriefingDone(true);
-      }, 1500);
-      return () => clearTimeout(fallback);
-    }
+        return;
+      }
 
-    const t = setTimeout(() => {
-      speak(briefing);
-    }, 500);
+      try {
+        const res = await fetch('/api/friday/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        });
 
-    return () => clearTimeout(t);
-  }, [phase, musicFinished, briefing, speak]);
+        if (!res.ok) {
+          await speakWithBrowserVoice(text);
+          setBriefingDone(true);
+          return;
+        }
+
+        const buf = await res.arrayBuffer();
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+        if (!AudioContextClass) {
+          await speakWithBrowserVoice(text);
+          setBriefingDone(true);
+          return;
+        }
+
+        const ac = new AudioContextClass();
+        audioContextRef.current = ac;
+
+        const decoded = await ac.decodeAudioData(buf.slice(0));
+        const src = ac.createBufferSource();
+        src.buffer = decoded;
+        src.connect(ac.destination);
+        src.start(0);
+
+        src.onended = async () => {
+          setBriefingDone(true);
+          try {
+            await ac.close();
+          } catch (_) {
+            // ignore
+          }
+        };
+      } catch (_) {
+        await speakWithBrowserVoice(text);
+        setBriefingDone(true);
+      }
+    },
+    [speakWithBrowserVoice, voiceStarted]
+  );
+
+  useEffect(() => {
+    if (phase < 4 || !musicFinished || voiceStarted) return;
+
+    const text =
+      typeof briefing === 'string' && briefing.trim()
+        ? briefing
+        : 'Good morning Ben. All systems are online and ready.';
+
+    speakTimeoutRef.current = window.setTimeout(() => {
+      speak(text);
+    }, 400);
+
+    return () => {
+      if (speakTimeoutRef.current) clearTimeout(speakTimeoutRef.current);
+    };
+  }, [phase, musicFinished, briefing, speak, voiceStarted]);
 
   useEffect(() => {
     if (briefingDone && phase >= 4) {
-      const t = setTimeout(() => {
+      bootCompleteTimeoutRef.current = window.setTimeout(() => {
         onComplete();
       }, 1500);
-      return () => clearTimeout(t);
+
+      return () => {
+        if (bootCompleteTimeoutRef.current) clearTimeout(bootCompleteTimeoutRef.current);
+      };
     }
   }, [briefingDone, phase, onComplete]);
 
   useEffect(() => {
-    const hardStop = setTimeout(() => {
+    const hardStop = window.setTimeout(() => {
       setBriefingDone(true);
-    }, 25000);
+    }, 30000);
 
     return () => clearTimeout(hardStop);
   }, []);
@@ -507,9 +550,31 @@ export default function BootSequence({ onComplete }) {
 
   useEffect(() => {
     return () => {
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+      if (finishTimeoutRef.current) clearTimeout(finishTimeoutRef.current);
+      if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
+      if (speakTimeoutRef.current) clearTimeout(speakTimeoutRef.current);
+      if (bootCompleteTimeoutRef.current) clearTimeout(bootCompleteTimeoutRef.current);
+
+      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+        try {
+          playerRef.current.destroy();
+        } catch (_) {
+          // ignore
+        }
+      }
+
       if (audioContextRef.current) {
         try {
           audioContextRef.current.close();
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        try {
+          window.speechSynthesis.cancel();
         } catch (_) {
           // ignore
         }
