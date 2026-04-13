@@ -65,6 +65,7 @@ export default function BootSequence({ onComplete }) {
   const [briefing, setBriefing] = useState('');
   const [showData, setShowData] = useState(false);
   const [briefingDone, setBriefingDone] = useState(false);
+  const [speechStarted, setSpeechStarted] = useState(false);
 
   // fetch all data on mount
   useEffect(() => {
@@ -75,7 +76,10 @@ export default function BootSequence({ onComplete }) {
 
   // speak via ElevenLabs
   const speak = useCallback(async (text) => {
-    if (!text) return;
+    if (!text) {
+      setBriefingDone(true);
+      return;
+    }
     try {
       const res = await fetch('/api/friday/voice', {
         method: 'POST',
@@ -84,7 +88,13 @@ export default function BootSequence({ onComplete }) {
       });
       if (!res.ok) throw new Error('voice fail');
       const buf = await res.arrayBuffer();
-      const ac  = new AudioContext();
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) {
+        setBriefingDone(true);
+        return;
+      }
+      setSpeechStarted(true);
+      const ac  = new AudioContextClass();
       const decoded = await ac.decodeAudioData(buf);
       const src = ac.createBufferSource();
       src.buffer = decoded;
@@ -141,6 +151,14 @@ export default function BootSequence({ onComplete }) {
       return () => clearTimeout(t);
     }
   }, [briefingDone, phase, onComplete]);
+
+  useEffect(() => {
+    const hardStop = setTimeout(() => {
+      if (phaseRef.current >= 4) setBriefingDone(true);
+    }, 14000);
+
+    return () => clearTimeout(hardStop);
+  }, []);
 
   // hard safety fallback so the loader cannot hang forever
   useEffect(() => {
@@ -412,7 +430,7 @@ export default function BootSequence({ onComplete }) {
             animationIterationCount: 'infinite',
             whiteSpace: 'nowrap',
           }}>
-            {briefingDone ? 'BRIEFING COMPLETE — LAUNCHING FRIDAY' : 'DELIVERING MORNING BRIEFING...'}
+            {briefingDone ? 'BRIEFING COMPLETE  LAUNCHING FRIDAY' : 'DELIVERING MORNING BRIEFING...'}
           </div>
         </div>
       )}

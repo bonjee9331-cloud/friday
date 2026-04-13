@@ -1,6 +1,7 @@
 'use client';
 import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
+import AppErrorBoundary from './AppErrorBoundary';
 
 // Load all three screens client-side only — avoids SSR hydration crashes
 const LockScreen   = dynamic(() => import('./LockScreen'),   { ssr: false });
@@ -13,7 +14,9 @@ export default function FridayApp() {
   const handleUnlock = useCallback(() => setState('booting'), []);
   const handleBooted = useCallback(() => setState('ready'),   []);
 
-  if (state === 'locked')  return <LockScreen   onUnlock={handleUnlock} />;
-  if (state === 'booting') return <BootSequence onComplete={handleBooted} />;
-  return <FridayCore />;
+  let screen = <FridayCore />;
+  if (state === 'locked') screen = <LockScreen onUnlock={handleUnlock} />;
+  if (state === 'booting') screen = <BootSequence onComplete={handleBooted} />;
+
+  return <AppErrorBoundary>{screen}</AppErrorBoundary>;
 }
