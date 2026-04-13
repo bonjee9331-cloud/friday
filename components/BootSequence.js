@@ -24,12 +24,14 @@ const BOOT_LOG = [
 ];
 
 function HeatmapPanel() {
-  const rows = 10, cols = 18;
-  const cells = Array.from({length: rows * cols}, (_, i) => {
-    const v = Math.random();
-    const r = Math.round(255 * Math.min(1, v * 2));
-    const g = Math.round(255 * Math.min(1, (1 - v) * 2));
-    return { r, g, v };
+  const [cells, setCells] = require('react').useState(() => {
+    const rows = 10, cols = 18;
+    return Array.from({length: rows * cols}, () => {
+      const v = Math.random();
+      const r = Math.round(255 * Math.min(1, v * 2));
+      const g = Math.round(255 * Math.min(1, (1 - v) * 2));
+      return { r, g, v };
+    });
   });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
