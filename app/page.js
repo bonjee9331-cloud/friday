@@ -1,3 +1,7 @@
-import FridayCore from '../components/FridayCore';
-export const metadata = { title: 'Friday — AI Assistant' };
-export default function HomePage() { return <FridayCore />; }
+import FridayApp from '../components/FridayApp';
+
+export const metadata = { title: 'Friday — AI System' };
+
+export default function HomePage() {
+  return <FridayApp />;
+}
