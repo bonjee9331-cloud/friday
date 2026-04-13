@@ -1,5 +1,6 @@
 import { askFriday } from '../../../lib/brain.js';
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 async function getWeather(){
   try{
     const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=-37.81&longitude=144.96&current_weather=true&timezone=Australia%2FMelbourne',{cache:'no-store'});
