@@ -1,23 +1,36 @@
 // POST /api/friday/voice
-// ElevenLabs TTS passthrough. Used by the web chat when voice mode is on
-// and the user wants premium voice instead of the browser default.
-// Body: { text: string }
-// Returns: audio/mpeg stream
+// Routes through multi-agent router, then TTS via ElevenLabs
+// Body: { text: string, history?: [], module?: string }
+// Returns: audio/mpeg with headers X-Agent-Name, X-Agent-Key, X-Agent-Colour, X-Agent-Reply
 
 export const runtime = 'nodejs';
 
+import { routeMessage } from '../../../../lib/agents/router.js';
+import { askFridayWithSystem } from '../../../../lib/brain.js';
+
 export async function POST(request) {
   try {
-    const { text } = await request.json();
+    const body = await request.json();
+    const { text, history = [], module = null } = body;
     if (!text) return new Response('text required', { status: 400 });
 
     const key = process.env.ELEVENLABS_API_KEY;
-    const voice = process.env.ELEVENLABS_VOICE_ID || 'FxZjRiAEBESrb7srpme7';
-    if (!key) {
-      return new Response('ELEVENLABS_API_KEY not set', { status: 503 });
+    if (!key) return new Response('ELEVENLABS_API_KEY not set', { status: 503 });
+
+    // Route to correct agent
+    const { agentKey, agent, systemPrompt, voiceId } = await routeMessage({ message: text, history, module });
+
+    // Get LLM reply using routed agent's system prompt
+    let replyText = text;
+    try {
+      const { reply } = await askFridayWithSystem({ userMessage: text, history, systemPrompt });
+      replyText = reply;
+    } catch (_) {
+      // Fall back to TTS of original text if LLM fails
     }
 
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voice}`, {
+    // Call ElevenLabs TTS
+    const ttsRes = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
       headers: {
         'Accept': 'audio/mpeg',
@@ -25,7 +38,7 @@ export async function POST(request) {
         'xi-api-key': key
       },
       body: JSON.stringify({
-        text,
+        text: replyText,
         model_id: 'eleven_turbo_v2_5',
         voice_settings: {
           stability: 0.5,
@@ -36,14 +49,22 @@ export async function POST(request) {
       })
     });
 
-    if (!res.ok) {
-      const err = await res.text();
+    if (!ttsRes.ok) {
+      const err = await ttsRes.text();
       return new Response(`ElevenLabs error: ${err}`, { status: 500 });
     }
 
-    return new Response(res.body, {
+    return new Response(ttsRes.body, {
       status: 200,
-      headers: { 'Content-Type': 'audio/mpeg' }
+      headers: {
+        'Content-Type': 'audio/mpeg',
+        'X-Agent-Name': agent.name,
+        'X-Agent-Key': agentKey,
+        'X-Agent-Role': agent.role,
+        'X-Agent-Colour': agent.colour,
+        'X-Agent-Reply': encodeURIComponent(replyText.slice(0, 500)),
+        'Access-Control-Expose-Headers': 'X-Agent-Name, X-Agent-Key, X-Agent-Role, X-Agent-Colour, X-Agent-Reply'
+      }
     });
   } catch (err) {
     return new Response(String(err.message || err), { status: 500 });

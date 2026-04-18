@@ -1,2 +1,10 @@
-node_modules/ 
-.next/ 
+node_modules/
+.next/
+
+# Local Netlify folder
+.netlify
+
+# Secrets
+.env.local
+.env.master
+.env*.local

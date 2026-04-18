@@ -1,17 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-
-const MODULES = [
-  { id: null, label: 'General' },
-  { id: 'bob', label: 'BOB Sales' },
-  { id: 'autopilot', label: 'Jobs' },
-  { id: 'tasks', label: 'Tasks' }
-];
+import AgentPanel from './AgentPanel';
 
 export default function ChatUI() {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: "Friday here. What do you need?" }
+    { role: 'assistant', content: "Friday here. What do you need?", agent: 'BOB' }
   ]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -19,6 +13,8 @@ export default function ChatUI() {
   const [conversationId, setConversationId] = useState(null);
   const [listening, setListening] = useState(false);
   const [voiceReply, setVoiceReply] = useState(false);
+  const [activeAgent, setActiveAgent] = useState('BOB');
+  const [forcedAgent, setForcedAgent] = useState(null);
   const scrollRef = useRef(null);
   const recognitionRef = useRef(null);
 
@@ -35,25 +31,58 @@ export default function ChatUI() {
     setMessages((m) => [...m, { role: 'user', content: text }]);
     setBusy(true);
     try {
-      const res = await fetch('/api/friday/chat', {
+      const res = await fetch('/api/friday/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           module,
           conversationId,
-          history: messages.slice(-20)
+          history: messages.slice(-20),
+          agentKey: forcedAgent
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'brain error');
-      setMessages((m) => [...m, { role: 'assistant', content: data.reply }]);
+      const respondingAgent = data.agentKey || 'BOB';
+      setActiveAgent(respondingAgent);
+      setMessages((m) => [...m, {
+        role: 'assistant',
+        content: data.reply,
+        agent: respondingAgent,
+        agentName: data.agentName,
+        agentColour: data.agentColour
+      }]);
       if (data.conversationId) setConversationId(data.conversationId);
-      if (voiceReply) speak(data.reply);
+      if (voiceReply) speakWithAgent(data.reply, data.voiceId);
     } catch (err) {
       setMessages((m) => [...m, { role: 'error', content: String(err.message || err) }]);
     } finally {
       setBusy(false);
+    }
+  }
+
+  function handleSelectAgent(agentKey) {
+    setForcedAgent(agentKey);
+    setActiveAgent(agentKey);
+  }
+
+  async function speakWithAgent(text, voiceId) {
+    try {
+      const res = await fetch('/api/friday/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, history: messages.slice(-6) })
+      });
+      if (!res.ok) throw new Error('TTS failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.play();
+      audio.onended = () => URL.revokeObjectURL(url);
+    } catch {
+      // Fall back to browser TTS
+      speak(text);
     }
   }
 
@@ -62,7 +91,6 @@ export default function ChatUI() {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-    // Prefer an Aussie or English male voice if available
     const preferred = voices.find((v) => /en-AU/i.test(v.lang)) ||
                       voices.find((v) => /en-GB/i.test(v.lang)) ||
                       voices.find((v) => /en-US/i.test(v.lang));
@@ -111,18 +139,9 @@ export default function ChatUI() {
       <div className="chat-header">
         <div>
           <div className="chat-title">Friday</div>
-          <div className="chat-sub">One brain. Many bodies.</div>
+          <div className="chat-sub">Multi-agent. One brain.</div>
         </div>
-        <div className="module-pills">
-          {MODULES.map((m) => (
-            <button
-              key={m.label}
-              className={'pill ' + (module === m.id ? 'active' : '')}
-              onClick={() => setModule(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             className={'pill ' + (voiceReply ? 'active' : '')}
             onClick={() => setVoiceReply((v) => !v)}
@@ -130,16 +149,40 @@ export default function ChatUI() {
           >
             Voice {voiceReply ? 'On' : 'Off'}
           </button>
+          {forcedAgent && (
+            <button className="pill" onClick={() => { setForcedAgent(null); setActiveAgent('BOB'); }}>
+              ✕ Unlock routing
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Agent roster */}
+      <div style={{ padding: '8px 0 4px' }}>
+        <AgentPanel activeAgent={activeAgent} onSelectAgent={handleSelectAgent} />
       </div>
 
       <div className="messages" ref={scrollRef}>
         {messages.map((m, i) => (
-          <div key={i} className={'msg ' + m.role}>
+          <div key={i} className={'msg ' + m.role} style={
+            m.role === 'assistant' && m.agentColour
+              ? { borderLeft: `3px solid ${m.agentColour}`, paddingLeft: 8 }
+              : {}
+          }>
+            {m.role === 'assistant' && m.agentName && (
+              <div style={{ fontSize: 10, color: m.agentColour || 'var(--text-dim)', marginBottom: 2, fontWeight: 700, letterSpacing: 1 }}>
+                {m.agentName}
+              </div>
+            )}
             {m.content}
           </div>
         ))}
-        {busy && <div className="msg assistant">...</div>}
+        {busy && (
+          <div className="msg assistant" style={{ borderLeft: `3px solid var(--text-dim)`, paddingLeft: 8 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 2 }}>{activeAgent}</div>
+            ...
+          </div>
+        )}
       </div>
 
       <div className="composer">
@@ -155,7 +198,7 @@ export default function ChatUI() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKey}
-          placeholder={module ? `Message Friday (${module} mode)` : 'Message Friday'}
+          placeholder={forcedAgent ? `Talking to ${forcedAgent}...` : 'Message Friday — routes automatically'}
           rows={1}
         />
         <button className="btn" onClick={() => send()} disabled={busy || !input.trim()}>
