@@ -1,5 +1,7 @@
 import './globals.css';
 import FridayNav from '../components/FridayNav';
+import WeatherWidget from '../components/WeatherWidget';
+import NewsTicker from '../components/NewsTicker';
 
 export const metadata = {
   title: 'Friday',
@@ -12,8 +14,14 @@ export default function RootLayout({ children }) {
       <body>
         <div className="shell">
           <FridayNav />
-          <main className="main">{children}</main>
+          <main className="main" style={{ paddingBottom: 28 }}>
+            <div style={{ position:'fixed', top:12, right:16, zIndex:40 }}>
+              <WeatherWidget />
+            </div>
+            {children}
+          </main>
         </div>
+        <NewsTicker />
       </body>
     </html>
   );

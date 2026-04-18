@@ -4,7 +4,7 @@ const WMO_ICON={0:'Clear Sky',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45
 function desc(c){return WMO[c]||'Variable';}
 export async function GET(){
   try{
-    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=-37.81&longitude=144.96&current_weather=true&hourly=apparent_temperature,precipitation_probability&timezone=Australia%2FMelbourne&forecast_days=1',{cache:'no-store'});
+    const r=await fetch('https://api.open-meteo.com/v1/forecast?latitude=12.57&longitude=99.96&current_weather=true&hourly=apparent_temperature,precipitation_probability&timezone=Asia%2FBangkok&forecast_days=1',{cache:'no-store'});
     const d=await r.json();const w=d.current_weather;
     const hr=new Date().getHours();
     const feels=Math.round(d.hourly?.apparent_temperature?.[hr]??w.temperature);
