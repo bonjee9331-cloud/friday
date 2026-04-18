@@ -24,25 +24,42 @@ export default function FridayApp() {
   if (state === 'locked')   return <AppErrorBoundary><LockScreen onUnlock={handleUnlock} /></AppErrorBoundary>;
   if (state === 'booting')  return <AppErrorBoundary><BootSequence onComplete={handleBooted} /></AppErrorBoundary>;
 
+  const TABS = [
+    { id: 'dashboard', label: 'COMMAND CENTER', icon: '◈' },
+    { id: 'chat',      label: 'NEURAL LINK',    icon: '◉' },
+  ];
+
   return (
     <AppErrorBoundary>
       <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
-        {/* tab bar */}
+        {/* Tab bar */}
         <div style={{
-          display:'flex', gap:0,
-          borderBottom:'1px solid rgba(255,107,53,0.15)',
-          background:'rgba(11,13,18,0.9)',
-          flexShrink:0,
+          display:'flex', alignItems:'center', gap:0,
+          borderBottom:'1px solid rgba(0,212,255,0.15)',
+          background:'rgba(4,12,20,0.97)',
+          flexShrink:0, position:'relative',
+          backdropFilter:'blur(10px)',
         }}>
-          {[['dashboard','DASHBOARD'],['chat','CHAT']].map(([id, label]) => (
+          {/* Horizontal scan line */}
+          <div style={{
+            position:'absolute', bottom:0, left:0, right:0, height:1,
+            background:'linear-gradient(90deg, transparent, rgba(0,212,255,0.4), transparent)',
+          }} />
+          {TABS.map(({ id, label, icon }) => (
             <button key={id} onClick={() => setView(id)} style={{
-              padding:'8px 20px',
-              fontSize:10, letterSpacing:3,
+              padding:'10px 24px',
+              fontSize:9, letterSpacing:3,
               background:'none', border:'none', cursor:'pointer',
-              color: view === id ? '#ff6b35' : 'rgba(255,107,53,0.4)',
-              borderBottom: view === id ? '2px solid #ff6b35' : '2px solid transparent',
+              fontFamily:'var(--font-hud)',
+              color: view === id ? 'var(--cyan)' : 'rgba(0,212,255,0.3)',
+              borderBottom: view === id ? '2px solid var(--cyan)' : '2px solid transparent',
               transition:'all 0.2s',
-            }}>{label}</button>
+              display:'flex', alignItems:'center', gap:8,
+              boxShadow: view === id ? 'inset 0 -2px 12px rgba(0,212,255,0.1)' : 'none',
+            }}>
+              <span style={{ filter: view === id ? 'drop-shadow(0 0 6px var(--cyan))' : 'none' }}>{icon}</span>
+              {label}
+            </button>
           ))}
         </div>
         <div style={{ flex:1, overflow:'hidden' }}>
