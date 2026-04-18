@@ -5,6 +5,8 @@ const MODULES = [
   { id: null, label: 'GENERAL' }, { id: 'bob', label: 'BOB OPS' },
   { id: 'autopilot', label: 'JOBS' }, { id: 'tasks', label: 'TASKS' },
 ];
+const AGENT_COLOURS = { BOB:'#ff6b35', SUSAN:'#3dd68c', DOUG:'#60a5fa', RILEY:'#f59e0b', MAYA:'#c084fc' };
+const AGENT_ICONS   = { BOB:'🎯', SUSAN:'💼', DOUG:'⚖️', RILEY:'📊', MAYA:'🔍' };
 const WAKE_PHRASES = ["daddy's home",'daddys home','daddy','hey friday','friday wake up'];
 const C = {
   idle:       { ring: '#1a6fff' },
@@ -33,19 +35,22 @@ function playChime(ctx){
 }
 
 export default function FridayCore() {
-  const [mode,    setMode]    = useState('idle');
-  const [msgs,    setMsgs]    = useState([]);
-  const [module,  setModule]  = useState(null);
-  const [convId,  setConvId]  = useState(null);
-  const [wakeOn,  setWakeOn]  = useState(false);
-  const [input,   setInput]   = useState('');
-  const [weather, setWeather] = useState(null);
-  const [news,    setNews]    = useState([]);
-  const [tickX,   setTickX]   = useState(0);
-  const [showMus, setShowMus] = useState(false);
-  const [musUrl,  setMusUrl]  = useState(DEFAULT_MUSIC);
-  const [brief,   setBrief]   = useState('');
-  const [showBrief,setShowBrief]=useState(false);
+  const [mode,      setMode]      = useState('idle');
+  const [msgs,      setMsgs]      = useState([]);
+  const [module,    setModule]    = useState(null);
+  const [convId,    setConvId]    = useState(null);
+  const [wakeOn,    setWakeOn]    = useState(false);
+  const [input,     setInput]     = useState('');
+  const [weather,   setWeather]   = useState(null);
+  const [news,      setNews]      = useState([]);
+  const [tickX,     setTickX]     = useState(0);
+  const [showMus,   setShowMus]   = useState(false);
+  const [musUrl,    setMusUrl]    = useState(DEFAULT_MUSIC);
+  const [brief,     setBrief]     = useState('');
+  const [showBrief, setShowBrief] = useState(false);
+  const [activeAgent, setActiveAgent] = useState('BOB');
+  const [showRoster,  setShowRoster]  = useState(false);
+  const [forcedAgent, setForcedAgent] = useState(null);
 
   const modeRef   =useRef('idle'); const msgsRef  =useRef([]); const convIdRef=useRef(null);
   const modRef    =useRef(null);   const clapBuf  =useRef([]);  const lastClap =useRef(0);
@@ -214,24 +219,25 @@ export default function FridayCore() {
     });
   }
 
-  // Chat
+  // Chat via agent router
   const sendMessage=useCallback(async(text)=>{
     const t=(text||'').trim(); if(!t) return;
     setMsgs(prev=>[...prev,{role:'user',content:t}]);
     go('processing');
     try{
-      const res=await fetch('/api/friday/chat',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({message:t,module:modRef.current,conversationId:convIdRef.current,history:msgsRef.current.slice(-20)})});
+      const res=await fetch('/api/friday/agent',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({message:t,module:modRef.current,history:msgsRef.current.slice(-20),agentKey:forcedAgent})});
       const data=await res.json();
       if(!res.ok) throw new Error(data.error||'brain error');
-      setMsgs(prev=>[...prev,{role:'assistant',content:data.reply}]);
-      if(data.conversationId)setConvId(data.conversationId);
+      const respondingAgent=data.agentKey||'BOB';
+      setActiveAgent(respondingAgent);
+      setMsgs(prev=>[...prev,{role:'assistant',content:data.reply,agent:respondingAgent,agentColour:data.agentColour}]);
       await speak(data.reply);
     }catch(err){
       setMsgs(prev=>[...prev,{role:'error',content:String(err.message)}]);
       go('idle');
     }
-  },[speak]);
+  },[speak,forcedAgent]);
 
   // Mic
   const startListening=useCallback(()=>{
@@ -375,18 +381,39 @@ export default function FridayCore() {
 
         {/* Transcript */}
         <div style={{flex:1,position:'relative'}}>
+          {/* Agent roster popup */}
+          {showRoster&&(
+            <div style={{position:'absolute',left:28,top:0,zIndex:40,background:'rgba(5,8,16,0.97)',border:`1px solid ${col}30`,borderRadius:10,padding:'14px 16px',backdropFilter:'blur(10px)'}}>
+              <div style={{fontSize:8,letterSpacing:3,color:col,opacity:0.5,marginBottom:10}}>AGENT ROSTER — CLICK TO LOCK</div>
+              {Object.entries(AGENT_COLOURS).map(([key,c])=>(
+                <button key={key} onClick={()=>{setForcedAgent(forcedAgent===key?null:key);setActiveAgent(key);setShowRoster(false);}}
+                  style={{display:'flex',alignItems:'center',gap:8,width:'100%',background:forcedAgent===key?`${c}22`:'transparent',border:`1px solid ${forcedAgent===key?c:c+'33'}`,borderRadius:6,padding:'7px 12px',marginBottom:6,cursor:'pointer',color:c,fontFamily:'inherit',fontSize:11,fontWeight:forcedAgent===key?700:400}}>
+                  <span style={{fontSize:16}}>{AGENT_ICONS[key]}</span>
+                  <span style={{letterSpacing:1}}>{key}</span>
+                  {forcedAgent===key&&<span style={{marginLeft:'auto',fontSize:9,opacity:0.7}}>LOCKED</span>}
+                </button>
+              ))}
+            </div>
+          )}
+
           {msgs.length>0&&(
-            <div style={{position:'absolute',right:32,top:0,bottom:0,width:310,display:'flex',flexDirection:'column',justifyContent:'flex-end',gap:8,paddingBottom:12,overflowY:'auto'}}>
-              {msgs.slice(-7).map((m,i)=>(
+            <div style={{position:'absolute',right:32,top:0,bottom:0,width:320,display:'flex',flexDirection:'column',justifyContent:'flex-end',gap:8,paddingBottom:12,overflowY:'auto'}}>
+              {msgs.slice(-7).map((m,i)=>{
+                const ac=m.agentColour||(m.agent?AGENT_COLOURS[m.agent]:null)||'rgba(169,124,255,1)';
+                return(
                 <div key={i} style={{
-                  background:m.role==='user'?'rgba(26,111,255,0.07)':m.role==='error'?'rgba(255,92,108,0.07)':'rgba(169,124,255,0.07)',
-                  border:`1px solid ${m.role==='user'?'rgba(26,111,255,0.2)':m.role==='error'?'rgba(255,92,108,0.28)':'rgba(169,124,255,0.2)'}`,
+                  background:m.role==='user'?'rgba(26,111,255,0.07)':m.role==='error'?'rgba(255,92,108,0.07)':`${ac}0f`,
+                  border:`1px solid ${m.role==='user'?'rgba(26,111,255,0.2)':m.role==='error'?'rgba(255,92,108,0.28)':`${ac}30`}`,
+                  borderLeft:m.role==='assistant'&&m.agent?`3px solid ${ac}`:'',
                   borderRadius:6,padding:'8px 12px',fontSize:11,lineHeight:1.55,
                   color:m.role==='user'?'#8ab4ff':m.role==='error'?'#ff9090':'#ccc'}}>
-                  <div style={{fontSize:8,letterSpacing:2,opacity:0.38,marginBottom:3}}>{m.role==='user'?'YOU':m.role==='error'?'ERROR':'FRIDAY'}</div>
-                  {m.content.length>260?m.content.slice(0,260)+'...':m.content}
+                  <div style={{fontSize:8,letterSpacing:2,opacity:0.45,marginBottom:3,color:m.role==='assistant'&&ac?ac:'inherit'}}>
+                    {m.role==='user'?'YOU':m.role==='error'?'ERROR':m.agent||'FRIDAY'}
+                    {m.role==='assistant'&&m.agent&&AGENT_ICONS[m.agent]?' '+AGENT_ICONS[m.agent]:''}
+                  </div>
+                  {m.content.length>280?m.content.slice(0,280)+'...':m.content}
                 </div>
-              ))}
+              );})}
             </div>
           )}
         </div>
@@ -402,10 +429,15 @@ export default function FridayCore() {
 
         {/* Controls */}
         <div style={{padding:'10px 28px 22px'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,flexWrap:'wrap'}}>
             <button onClick={()=>setWakeOn(w=>!w)} style={{background:wakeOn?col:'transparent',color:wakeOn?'#000':col,border:`1px solid ${col}`,borderRadius:3,padding:'4px 14px',fontSize:9,letterSpacing:2,fontWeight:700,cursor:'pointer'}}>{wakeOn?'◉ WAKE WORD ACTIVE':'○ WAKE WORD OFF'}</button>
-            <span style={{fontSize:9,color:col,opacity:0.32,letterSpacing:1}}>SAY "DADDY'S HOME" OR DOUBLE-CLAP</span>
-            <button onClick={onWake} style={{marginLeft:'auto',background:'transparent',color:col,border:`1px solid ${col}40`,borderRadius:3,padding:'4px 12px',fontSize:9,letterSpacing:2,cursor:'pointer'}}>WAKE NOW</button>
+            {/* Active agent indicator */}
+            <button onClick={()=>setShowRoster(r=>!r)} style={{display:'flex',alignItems:'center',gap:5,background:`${AGENT_COLOURS[activeAgent]||col}18`,border:`1px solid ${AGENT_COLOURS[activeAgent]||col}`,borderRadius:3,padding:'4px 12px',cursor:'pointer',color:AGENT_COLOURS[activeAgent]||col,fontSize:9,letterSpacing:2,fontWeight:700,fontFamily:'inherit'}}>
+              {AGENT_ICONS[activeAgent]} {activeAgent}{forcedAgent?' ⊗':''}
+            </button>
+            {forcedAgent&&<button onClick={()=>{setForcedAgent(null);setActiveAgent('BOB');}} style={{background:'transparent',border:`1px solid ${col}40`,borderRadius:3,padding:'4px 8px',color:col,fontSize:9,cursor:'pointer',letterSpacing:1,fontFamily:'inherit'}}>UNLOCK</button>}
+            <span style={{fontSize:9,color:col,opacity:0.32,letterSpacing:1,marginLeft:4}}>DOUBLE-CLAP OR SAY "DADDY'S HOME"</span>
+            <button onClick={onWake} style={{marginLeft:'auto',background:'transparent',color:col,border:`1px solid ${col}40`,borderRadius:3,padding:'4px 12px',fontSize:9,letterSpacing:2,cursor:'pointer',fontFamily:'inherit'}}>WAKE NOW</button>
           </div>
           <div style={{display:'flex',gap:10,alignItems:'center'}}>
             <button onMouseDown={startListening} onMouseUp={stopListening} onTouchStart={e=>{e.preventDefault();startListening();}} onTouchEnd={stopListening}

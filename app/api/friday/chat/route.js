@@ -4,7 +4,8 @@
 // Returns: { reply, conversationId, mock }
 
 import { NextResponse } from 'next/server';
-import { askFriday } from '../../../../lib/brain.js';
+import { askFriday, askFridayWithSystem } from '../../../../lib/brain.js';
+import { routeMessage } from '../../../../lib/agents/router.js';
 import { saveTurn, getRecentHistory, getServerClient } from '../../../../lib/supabase.js';
 
 export const runtime = 'nodejs';
@@ -42,11 +43,12 @@ export async function POST(request) {
       await saveTurn({ conversationId, role: 'user', content: message, module });
     }
 
-    // Ask Friday
-    const { reply, mock } = await askFriday({
+    // Route to correct agent and ask
+    const routing = await routeMessage({ message, history, module });
+    const { reply, mock } = await askFridayWithSystem({
       userMessage: message,
       history,
-      module
+      systemPrompt: routing.systemPrompt
     });
 
     // Save the assistant turn
