@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import AgentPanel from './AgentPanel';
+import { authedFetch } from '../lib/client-auth';
 
 export default function ChatUI() {
   const [messages, setMessages] = useState([
@@ -31,9 +32,8 @@ export default function ChatUI() {
     setMessages((m) => [...m, { role: 'user', content: text }]);
     setBusy(true);
     try {
-      const res = await fetch('/api/friday/agent', {
+      const res = await authedFetch('/api/friday/agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: text,
           module,
@@ -69,9 +69,8 @@ export default function ChatUI() {
 
   async function speakWithAgent(text, voiceId) {
     try {
-      const res = await fetch('/api/friday/voice', {
+      const res = await authedFetch('/api/friday/voice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, history: messages.slice(-6) })
       });
       if (!res.ok) throw new Error('TTS failed');

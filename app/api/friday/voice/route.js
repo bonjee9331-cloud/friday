@@ -7,8 +7,10 @@ export const runtime = 'nodejs';
 
 import { routeMessage } from '../../../../lib/agents/router.js';
 import { askFridayWithSystem } from '../../../../lib/brain.js';
+import { isAuthorized, unauthorized } from '../../../../lib/auth.js';
 
 export async function POST(request) {
+  if (!isAuthorized(request)) return unauthorized();
   try {
     const body = await request.json();
     const { text, history = [], module = null } = body;

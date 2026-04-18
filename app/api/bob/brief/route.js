@@ -1,10 +1,10 @@
 // GET /api/bob/brief
 // Returns the day's BOB sales ops briefing as markdown text.
-// Pulls current week rep stats from supabase if configured, otherwise uses hardcoded BOB v5 defaults.
 
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase.js';
 import { askFriday } from '../../../../lib/brain.js';
+import { isAuthorized, unauthorized } from '../../../../lib/auth.js';
 
 export const runtime = 'nodejs';
 
@@ -17,7 +17,9 @@ const DEFAULT_STATS = {
   ]
 };
 
-export async function GET() {
+export async function GET(request) {
+  if (!isAuthorized(request)) return unauthorized();
+
   const client = getServerClient();
   let statsSummary = '';
 
@@ -41,10 +43,6 @@ export async function GET() {
 
   const prompt = `Write the D2MS morning BOB briefing for Ben. Use the stats below. Call out the three rep patterns. Recommend the single most important coaching focus for today. Keep it under 200 words. Markdown. No em dashes.\n\nSTATS:\n${statsSummary}`;
 
-  const { reply, mock } = await askFriday({
-    userMessage: prompt,
-    module: 'bob'
-  });
-
+  const { reply, mock } = await askFriday({ userMessage: prompt, module: 'bob' });
   return NextResponse.json({ brief: reply, mock });
 }

@@ -8,8 +8,10 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { routeMessage, AGENTS } from '../../../../lib/agents/router.js';
 import { askFridayWithSystem } from '../../../../lib/brain.js';
+import { isAuthorized, unauthorized } from '../../../../lib/auth.js';
 
 export async function POST(request) {
+  if (!isAuthorized(request)) return unauthorized();
   try {
     const body = await request.json();
     const { message, history = [], module = null, agentKey: forcedAgent } = body;

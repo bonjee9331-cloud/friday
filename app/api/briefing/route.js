@@ -1,4 +1,5 @@
 import { askFriday } from '../../../lib/brain.js';
+import { isAuthorized, unauthorized } from '../../../lib/auth.js';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 async function getWeather(){
@@ -20,7 +21,8 @@ async function getNews(){
       .map(m=>m[1].trim()).filter(t=>t&&!t.toLowerCase().includes('bbc')).slice(0,5);
   }catch{return [];}
 }
-export async function GET(){
+export async function GET(request){
+  if (!isAuthorized(request)) return unauthorized();
   const [weather,headlines]=await Promise.all([getWeather(),getNews()]);
   const now=new Date().toLocaleString('en-AU',{timeZone:'Asia/Bangkok',weekday:'long',hour:'2-digit',minute:'2-digit'});
   const prompt=`You are FRIDAY, Ben Lynch's personal AI. Deliver his morning briefing. Max 90 words. Sharp, punchy, Aussie tone. Spoken word only — no bullet points, no markdown, no lists. Natural flowing sentences.\n\nInclude: time, Hua Hin weather, weave in 2 headlines and whether they matter to Ben's day, then one sharp focus for today (job hunting, Fair Work case, or life admin — whatever is most pressing).\n\nContext: Ben was dismissed from D2MS on 10 April 2026, currently in Hua Hin Thailand building his Fair Work case and job hunting.\n\nTime: ${now}\nWeather: Hua Hin, ${weather}\nHeadlines: ${headlines.join(' | ')}`;

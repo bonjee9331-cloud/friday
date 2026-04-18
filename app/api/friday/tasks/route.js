@@ -5,10 +5,12 @@
 
 import { NextResponse } from 'next/server';
 import { getServerClient } from '../../../../lib/supabase.js';
+import { isAuthorized, unauthorized } from '../../../../lib/auth.js';
 
 export const runtime = 'nodejs';
 
 export async function GET(request) {
+  if (!isAuthorized(request)) return unauthorized();
   const client = getServerClient();
   if (!client) return NextResponse.json({ tasks: [], mock: true });
   const url = new URL(request.url);
@@ -21,6 +23,7 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
+  if (!isAuthorized(request)) return unauthorized();
   const body = await request.json();
   const client = getServerClient();
   if (!client) return NextResponse.json({ error: 'supabase not configured' }, { status: 503 });
@@ -39,6 +42,7 @@ export async function POST(request) {
 }
 
 export async function PATCH(request) {
+  if (!isAuthorized(request)) return unauthorized();
   const body = await request.json();
   const client = getServerClient();
   if (!client) return NextResponse.json({ error: 'supabase not configured' }, { status: 503 });

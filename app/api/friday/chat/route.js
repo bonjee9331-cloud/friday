@@ -7,10 +7,12 @@ import { NextResponse } from 'next/server';
 import { askFriday, askFridayWithSystem } from '../../../../lib/brain.js';
 import { routeMessage } from '../../../../lib/agents/router.js';
 import { saveTurn, getRecentHistory, getServerClient } from '../../../../lib/supabase.js';
+import { isAuthorized, unauthorized } from '../../../../lib/auth.js';
 
 export const runtime = 'nodejs';
 
 export async function POST(request) {
+  if (!isAuthorized(request)) return unauthorized();
   try {
     const body = await request.json();
     const { message, module = null, conversationId: incomingId, history: passedHistory } = body;

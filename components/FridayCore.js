@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { authedFetch } from '../lib/client-auth';
 
 const MODULES = [
   { id: null, label: 'GENERAL' }, { id: 'bob', label: 'BOB OPS' },
@@ -193,7 +194,7 @@ export default function FridayCore() {
   const speak=useCallback(async(text)=>{
     go('speaking');
     try{
-      const res=await fetch('/api/friday/voice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})});
+      const res=await authedFetch('/api/friday/voice',{method:'POST',body:JSON.stringify({text})});
       if(res.ok){
         const blob=await res.blob(); const url=URL.createObjectURL(blob);
         const aud=new Audio(url);
@@ -225,7 +226,7 @@ export default function FridayCore() {
     setMsgs(prev=>[...prev,{role:'user',content:t}]);
     go('processing');
     try{
-      const res=await fetch('/api/friday/agent',{method:'POST',headers:{'Content-Type':'application/json'},
+      const res=await authedFetch('/api/friday/agent',{method:'POST',
         body:JSON.stringify({message:t,module:modRef.current,history:msgsRef.current.slice(-20),agentKey:forcedAgent})});
       const data=await res.json();
       if(!res.ok) throw new Error(data.error||'brain error');
@@ -264,7 +265,7 @@ export default function FridayCore() {
       playChime(actx);
     }catch{}
     try{
-      const r=await fetch('/api/briefing');
+      const r=await authedFetch('/api/briefing');
       const d=await r.json();
       if(d.briefing){
         setBrief(d.briefing); setShowBrief(true);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { authedFetch } from '../lib/client-auth';
 
 function trendBadge(t) {
   const colors = {
@@ -36,7 +37,7 @@ export default function BobDashboard() {
   async function loadBrief() {
     setLoadingBrief(true);
     try {
-      const res = await fetch('/api/bob/brief');
+      const res = await authedFetch('/api/bob/brief');
       const data = await res.json();
       setBrief(data.brief || data.error || 'No brief available');
     } catch (err) {
@@ -49,7 +50,7 @@ export default function BobDashboard() {
   async function loadRepStats() {
     setLoadingReps(true);
     try {
-      const res = await fetch('/api/sales/rep-stats');
+      const res = await authedFetch('/api/sales/rep-stats');
       const data = await res.json();
       setRepData(data);
     } catch {
@@ -63,9 +64,8 @@ export default function BobDashboard() {
     if (!rileyInput.trim() || rileyBusy) return;
     setRileyBusy(true);
     try {
-      const res = await fetch('/api/friday/agent', {
+      const res = await authedFetch('/api/friday/agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: rileyInput, agentKey: 'RILEY' })
       });
       const data = await res.json();

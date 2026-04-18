@@ -2,6 +2,7 @@
 // Returns rep performance data for Riley (sales floor agent)
 
 import { NextResponse } from 'next/server';
+import { isAuthorized, unauthorized } from '../../../../lib/auth.js';
 
 const REPS = [
   { name: 'Aaron Longmate',   b1: 83.2, b2: 61.5, canx: 16.8, trend: 'declining' },
@@ -22,7 +23,8 @@ const REPS = [
 
 const TARGETS = { b1: 90, b2: 65, canx: 10 };
 
-export async function GET() {
+export async function GET(request) {
+  if (!isAuthorized(request)) return unauthorized();
   const sorted = [...REPS].sort((a, b) => b.b1 - a.b1);
 
   const teamB1 = (REPS.reduce((s, r) => s + r.b1, 0) / REPS.length).toFixed(1);
