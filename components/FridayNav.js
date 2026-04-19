@@ -4,42 +4,74 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
-const LINKS = [
-  { href: '/',              label: 'COMMAND',      hint: 'Main interface',    icon: '◈' },
-  { href: '/bob',           label: 'BOB OPS',      hint: 'Sales floor',       icon: '◉' },
-  { href: '/jobs',          label: 'AUTOPILOT',    hint: 'Job hunting',       icon: '◎' },
-  { href: '/tasks',         label: 'TASKS',        hint: 'Daily runner',      icon: '▦' },
-  { href: '/brain',         label: 'BRAIN',        hint: 'Neural debug',      icon: '⬡' },
-  { href: '/teleprompter',  label: 'TELEPROMPTER', hint: 'Script overlay',    icon: '▤' },
-  { href: '/settings',      label: 'CONFIG',       hint: 'System settings',   icon: '⚙' },
+const NAV_GROUPS = [
+  {
+    heading: 'COMMAND',
+    links: [
+      { href: '/',    label: 'Main Hub',    hint: 'Overview + all tabs', icon: '◈', colour: '#00d4ff' },
+    ],
+  },
+  {
+    heading: 'AGENTS',
+    links: [
+      { href: '/bob',   label: 'Sales Ops',   hint: 'RILEY · floor monitor',  icon: '◉', colour: '#f59e0b' },
+      { href: '/jobs',  label: 'Job Hunt',    hint: 'SUSAN · autopilot',       icon: '◎', colour: '#3dd68c' },
+      { href: '/tasks', label: 'Tasks',       hint: 'DOUG · daily runner',     icon: '▦', colour: '#60a5fa' },
+    ],
+  },
+  {
+    heading: 'TOOLS',
+    links: [
+      { href: '/brain',         label: 'Brain',         hint: 'Neural debug',      icon: '⬡', colour: '#c084fc' },
+      { href: '/teleprompter',  label: 'Teleprompter',  hint: 'Script overlay',    icon: '▤', colour: '#ff6b35' },
+    ],
+  },
+  {
+    heading: 'SYSTEM',
+    links: [
+      { href: '/settings', label: 'Config', hint: 'Keys + integrations', icon: '⚙', colour: '#4a6080' },
+    ],
+  },
 ];
 
 const AGENTS = [
-  { key: 'BOB',   colour: '#ff6b35', label: 'EXEC' },
-  { key: 'SUSAN', colour: '#3dd68c', label: 'JOBS' },
-  { key: 'DOUG',  colour: '#60a5fa', label: 'LAW'  },
-  { key: 'RILEY', colour: '#f59e0b', label: 'SALES' },
-  { key: 'MAYA',  colour: '#c084fc', label: 'INTEL' },
+  { key: 'BOB',   colour: '#ff6b35', label: 'BOB'   },
+  { key: 'SUSAN', colour: '#3dd68c', label: 'SUSAN' },
+  { key: 'DOUG',  colour: '#60a5fa', label: 'DOUG'  },
+  { key: 'RILEY', colour: '#f59e0b', label: 'RILEY' },
+  { key: 'MAYA',  colour: '#c084fc', label: 'MAYA'  },
 ];
 
 function Clock() {
   const [time, setTime] = useState('');
+  const [date, setDate] = useState('');
   useEffect(() => {
-    const tick = () => setTime(new Date().toLocaleTimeString('en-AU', { hour12: false }));
+    const tick = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('en-AU', { hour12: false }));
+      setDate(now.toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short' }).toUpperCase());
+    };
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
   return (
-    <div style={{
-      fontFamily: 'var(--font-hud)',
-      fontSize: 22,
-      letterSpacing: 3,
-      color: 'var(--cyan)',
-      textShadow: '0 0 20px rgba(0,212,255,0.7)',
-      textAlign: 'center',
-      padding: '14px 0 6px',
-    }}>{time || '00:00:00'}</div>
+    <div style={{ textAlign: 'center', paddingTop: 10 }}>
+      <div style={{
+        fontFamily: 'var(--font-hud)',
+        fontSize: 20,
+        letterSpacing: 2,
+        color: 'var(--cyan)',
+        lineHeight: 1,
+      }}>{time || '00:00:00'}</div>
+      <div style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 8,
+        letterSpacing: 2,
+        color: 'var(--text-dim)',
+        marginTop: 4,
+      }}>{date}</div>
+    </div>
   );
 }
 
@@ -47,114 +79,153 @@ export default function FridayNav() {
   const path = usePathname();
 
   return (
-    <aside className="sidebar" style={{ position: 'relative' }}>
+    <aside className="sidebar">
 
       {/* Brand */}
       <div className="brand">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div className="brand-logo">F</div>
           <div>
             <div className="brand-name">FRIDAY</div>
-            <div className="brand-sub">AUTONOMOUS SYSTEM · v6</div>
+            <div className="brand-sub">AUTONOMOUS · v7</div>
           </div>
         </div>
         <Clock />
       </div>
 
-      {/* Nav links */}
-      <nav className="nav">
-        {LINKS.map((l) => {
-          const active = path === l.href;
-          return (
-            <Link key={l.href} href={l.href} className="nav-link" style={{
-              background: active ? 'rgba(0,212,255,0.08)' : undefined,
-              borderColor: active ? 'rgba(0,212,255,0.3)' : undefined,
+      {/* Grouped navigation */}
+      <nav className="nav" style={{ paddingTop: 10, paddingBottom: 10 }}>
+        {NAV_GROUPS.map((group) => (
+          <div key={group.heading} style={{ marginBottom: 4 }}>
+
+            {/* Section heading */}
+            <div style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 7,
+              letterSpacing: 3,
+              color: 'rgba(74,96,128,0.7)',
+              padding: '8px 14px 4px',
+              textTransform: 'uppercase',
+              userSelect: 'none',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 16,
-                  color: active ? 'var(--cyan)' : 'var(--text-dim)',
-                  width: 20,
-                  textAlign: 'center',
-                  transition: 'color 0.2s',
-                }}>{l.icon}</span>
-                <div>
-                  <div className="nav-label" style={{ color: active ? 'var(--cyan)' : undefined }}>
-                    {l.label}
+              {group.heading}
+            </div>
+
+            {/* Links in this group */}
+            {group.links.map((l) => {
+              const active = path === l.href;
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="nav-link"
+                  style={{
+                    background: active ? `${l.colour}0d` : undefined,
+                    borderColor: active ? `${l.colour}35` : undefined,
+                  }}
+                >
+                  {/* Active left bar */}
+                  {active && (
+                    <div style={{
+                      position: 'absolute',
+                      left: 0, top: 4, bottom: 4,
+                      width: 2,
+                      background: l.colour,
+                      borderRadius: 1,
+                    }} />
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 15,
+                      color: active ? l.colour : 'rgba(74,96,128,0.7)',
+                      width: 18,
+                      textAlign: 'center',
+                      transition: 'color 0.15s',
+                      filter: active ? `drop-shadow(0 0 4px ${l.colour})` : 'none',
+                    }}>{l.icon}</span>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="nav-label" style={{
+                        color: active ? l.colour : undefined,
+                        fontSize: 11,
+                      }}>
+                        {l.label}
+                      </div>
+                      <div className="nav-hint">{l.hint}</div>
+                    </div>
+
+                    {active && (
+                      <div style={{
+                        width: 5, height: 5,
+                        borderRadius: '50%',
+                        background: l.colour,
+                        boxShadow: `0 0 6px ${l.colour}`,
+                        animation: 'pulse-dot 2s ease-in-out infinite',
+                        flexShrink: 0,
+                      }} />
+                    )}
                   </div>
-                  <div className="nav-hint">{l.hint}</div>
-                </div>
-                {active && (
-                  <div style={{
-                    marginLeft: 'auto',
-                    width: 6, height: 6,
-                    borderRadius: '50%',
-                    background: 'var(--cyan)',
-                    boxShadow: '0 0 8px var(--cyan)',
-                    animation: 'pulse-dot 2s ease-in-out infinite',
-                  }} />
-                )}
-              </div>
-              {active && (
-                <div style={{
-                  position: 'absolute',
-                  left: 0, top: 0, bottom: 0,
-                  width: 2,
-                  background: 'linear-gradient(180deg, transparent, var(--cyan), transparent)',
-                }} />
-              )}
-            </Link>
-          );
-        })}
+                </Link>
+              );
+            })}
+
+            {/* Divider between groups (not after last) */}
+            <div style={{
+              height: 1,
+              margin: '6px 14px 2px',
+              background: 'rgba(0,212,255,0.05)',
+            }} />
+          </div>
+        ))}
       </nav>
 
-      {/* Agent roster */}
+      {/* Agent status strip */}
       <div style={{
-        padding: '12px 16px',
+        padding: '10px 14px 12px',
         borderTop: '1px solid var(--border)',
-        borderBottom: '1px solid var(--border)',
       }}>
         <div style={{
-          fontFamily: 'var(--font-hud)',
-          fontSize: 8,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 7,
           letterSpacing: 3,
-          color: 'var(--text-dim)',
-          marginBottom: 10,
-        }}>ACTIVE AGENTS</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {AGENTS.map(a => (
+          color: 'rgba(74,96,128,0.7)',
+          marginBottom: 8,
+          textTransform: 'uppercase',
+        }}>Active Agents</div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {AGENTS.map((a, i) => (
             <div key={a.key} style={{
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
-              gap: 3,
+              gap: 8,
             }}>
               <div style={{
-                width: 28, height: 28,
+                width: 6, height: 6,
                 borderRadius: '50%',
-                border: `1px solid ${a.colour}66`,
-                background: `${a.colour}12`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: `0 0 8px ${a.colour}40`,
-              }}>
-                <div style={{
-                  width: 8, height: 8,
-                  borderRadius: '50%',
-                  background: a.colour,
-                  boxShadow: `0 0 6px ${a.colour}`,
-                  animation: 'pulse-dot 2s ease-in-out infinite',
-                  animationDelay: `${AGENTS.indexOf(a) * 0.4}s`,
-                }} />
-              </div>
+                background: a.colour,
+                boxShadow: `0 0 5px ${a.colour}`,
+                animation: 'pulse-dot 2.5s ease-in-out infinite',
+                animationDelay: `${i * 0.3}s`,
+                flexShrink: 0,
+              }} />
               <span style={{
-                fontFamily: 'var(--font-hud)',
-                fontSize: 7,
+                fontFamily: 'var(--font-ui)',
+                fontWeight: 600,
+                fontSize: 11,
                 letterSpacing: 1,
                 color: a.colour,
-              }}>{a.label}</span>
+                opacity: 0.85,
+              }}>{a.key}</span>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 8,
+                color: 'rgba(74,96,128,0.6)',
+                marginLeft: 'auto',
+                letterSpacing: 0.5,
+              }}>ONLINE</span>
             </div>
           ))}
         </div>
@@ -163,10 +234,7 @@ export default function FridayNav() {
       {/* Status bar */}
       <div className="status">
         <span className="status-dot" />
-        <span>SYS ONLINE</span>
-        <span style={{ marginLeft: 'auto', color: 'rgba(0,212,255,0.3)', fontSize: 8 }}>
-          {new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }).toUpperCase()}
-        </span>
+        <span style={{ fontSize: 9, letterSpacing: 1 }}>SYS ONLINE</span>
       </div>
     </aside>
   );

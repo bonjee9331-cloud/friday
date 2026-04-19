@@ -32,8 +32,14 @@ const TAB_COLOURS = {
 };
 
 export default function FridayApp() {
-  const [state, setState] = useState('locked');
-  const [tab,   setTab]   = useState('overview');
+  // Skip lock + boot if this session has already completed the boot sequence
+  const [state, setState] = useState(() => {
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('friday_booted')) {
+      return 'ready';
+    }
+    return 'locked';
+  });
+  const [tab, setTab] = useState('overview');
 
   const handleUnlock = useCallback(() => {
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('friday_booted')) {
