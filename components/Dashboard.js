@@ -84,7 +84,6 @@ function SalesPanel() {
       padding: '18px 20px',
       position: 'relative',
       overflow: 'hidden',
-      gridColumn: 'span 2',
     }}>
       {/* Corner glow */}
       <div style={{
@@ -354,36 +353,35 @@ function SystemPanel() {
 
   return (
     <div style={{
-      background: 'var(--panel)',
-      border: '1px solid rgba(0,212,255,0.18)',
-      borderRadius: 4, padding: '18px 20px',
+      background: 'rgba(4,12,20,0.7)',
+      border: '1px solid rgba(0,212,255,0.10)',
+      borderLeft: '3px solid rgba(0,212,255,0.4)',
+      borderRadius: 3,
+      padding: '12px 16px',
     }}>
-      <PanelHeader icon="⬡" label="SYSTEM STATUS" colour="var(--cyan)" live />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: 3, color: 'var(--text-dim)' }}>
+          SYSTEM STATUS
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--text-dim)', letterSpacing: 1 }}>
+          {fmt(uptime)}
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 12px' }}>
         {systems.map(s => (
-          <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: 'var(--font-hud)', fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)' }}>{s.label}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: s.ok ? 'var(--green)' : 'var(--red)' }}>{s.val}</span>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: s.ok ? 'var(--green)' : 'var(--red)', boxShadow: s.ok ? '0 0 6px var(--green)' : '0 0 6px var(--red)' }} />
+          <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{
+              width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+              background: s.ok ? 'var(--green)' : 'var(--red)',
+              boxShadow: s.ok ? '0 0 5px var(--green)' : '0 0 5px var(--red)',
+              animation: s.ok ? 'pulse-dot 2.5s ease-in-out infinite' : 'none',
+            }} />
+            <div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 7, letterSpacing: 1.5, color: 'var(--text-dim)' }}>{s.label}</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: s.ok ? 'rgba(200,216,240,0.75)' : 'var(--red)' }}>{s.val}</div>
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Hex decoration */}
-      <div style={{ marginTop: 14, textAlign: 'center' }}>
-        <svg width="80" height="70" style={{ opacity: 0.15 }}>
-          {[0,1,2,3,4,5].map(i => {
-            const a = (i * 60 - 90) * Math.PI / 180;
-            const x1 = 40 + 28 * Math.cos(a), y1 = 35 + 28 * Math.sin(a);
-            const a2 = ((i+1) * 60 - 90) * Math.PI / 180;
-            const x2 = 40 + 28 * Math.cos(a2), y2 = 35 + 28 * Math.sin(a2);
-            return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#00d4ff" strokeWidth="1"/>;
-          })}
-          <circle cx="40" cy="35" r="10" fill="none" stroke="#00d4ff" strokeWidth="1" />
-          <circle cx="40" cy="35" r="4" fill="#00d4ff" />
-        </svg>
       </div>
     </div>
   );
@@ -394,16 +392,24 @@ export default function Dashboard() {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
-      gridTemplateRows: 'auto auto',
-      gap: 16, padding: 20,
+      gridTemplateColumns: '1fr 340px',
+      gridTemplateRows: 'auto 1fr',
+      gap: 14,
+      padding: '16px 20px',
       height: '100%',
       boxSizing: 'border-box',
+      overflowY: 'auto',
     }}>
-      <SalesPanel />
+      {/* Row 1: Sales spans full width */}
+      <div style={{ gridColumn: '1 / -1' }}>
+        <SalesPanel />
+      </div>
+      {/* Row 2: Jobs (wider) + right column (Voice + System stacked) */}
       <JobsPanel />
-      <VoicePanel />
-      <SystemPanel />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <VoicePanel />
+        <SystemPanel />
+      </div>
     </div>
   );
 }
