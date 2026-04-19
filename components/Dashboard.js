@@ -322,21 +322,34 @@ function VoicePanel() {
 
 // ─── System Status Panel ─────────────────────────────────────
 function SystemPanel() {
-  const [uptime, setUptime] = useState(0);
+  const [uptime,    setUptime]    = useState(0);
+  const [gazeActive, setGazeActive] = useState(null); // null = loading
+
   useEffect(() => {
     const start = Date.now();
     const id = setInterval(() => setUptime(Math.floor((Date.now() - start) / 1000)), 1000);
     return () => clearInterval(id);
   }, []);
 
+  useEffect(() => {
+    const check = () =>
+      fetch('/api/tools/gaze-status').then(r => r.json())
+        .then(d => setGazeActive(d.active))
+        .catch(() => setGazeActive(false));
+    check();
+    const id = setInterval(check, 8000);
+    return () => clearInterval(id);
+  }, []);
+
   const fmt = s => `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 
   const systems = [
-    { label: 'BRAIN', val: 'CLAUDE SONNET 4.6', ok: true },
-    { label: 'VOICE', val: 'ELEVENLABS TTS',     ok: true },
-    { label: 'MEMORY', val: 'SUPABASE',           ok: true },
-    { label: 'AGENTS', val: '5 ONLINE',           ok: true },
-    { label: 'SESSION', val: fmt(uptime),          ok: true },
+    { label: 'BRAIN',       val: 'CLAUDE SONNET 4.6',                           ok: true },
+    { label: 'VOICE',       val: 'ELEVENLABS TTS',                               ok: true },
+    { label: 'MEMORY',      val: 'SUPABASE',                                     ok: true },
+    { label: 'AGENTS',      val: '5 ONLINE',                                     ok: true },
+    { label: 'GAZE CORRECT',val: gazeActive === null ? 'CHECKING...' : gazeActive ? 'ACTIVE' : 'OFFLINE', ok: !!gazeActive },
+    { label: 'SESSION',     val: fmt(uptime),                                    ok: true },
   ];
 
   return (

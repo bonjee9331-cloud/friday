@@ -5,12 +5,13 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 const LINKS = [
-  { href: '/',           label: 'COMMAND',  hint: 'Main interface',   icon: '◈' },
-  { href: '/bob',        label: 'BOB OPS',  hint: 'Sales floor',      icon: '◉' },
-  { href: '/jobs',       label: 'AUTOPILOT',hint: 'Job hunting',       icon: '◎' },
-  { href: '/tasks',      label: 'TASKS',    hint: 'Daily runner',      icon: '▦' },
-  { href: '/brain',      label: 'BRAIN',    hint: 'Neural debug',      icon: '⬡' },
-  { href: '/settings',   label: 'CONFIG',   hint: 'System settings',   icon: '⚙' },
+  { href: '/',              label: 'COMMAND',      hint: 'Main interface',    icon: '◈' },
+  { href: '/bob',           label: 'BOB OPS',      hint: 'Sales floor',       icon: '◉' },
+  { href: '/jobs',          label: 'AUTOPILOT',    hint: 'Job hunting',       icon: '◎' },
+  { href: '/tasks',         label: 'TASKS',        hint: 'Daily runner',      icon: '▦' },
+  { href: '/brain',         label: 'BRAIN',        hint: 'Neural debug',      icon: '⬡' },
+  { href: '/teleprompter',  label: 'TELEPROMPTER', hint: 'Script overlay',    icon: '▤' },
+  { href: '/settings',      label: 'CONFIG',       hint: 'System settings',   icon: '⚙' },
 ];
 
 const AGENTS = [
