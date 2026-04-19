@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import AppErrorBoundary from './AppErrorBoundary';
 
@@ -15,23 +15,6 @@ export default function FridayApp() {
     return 'locked';
   });
 
-  const [mode, setMode] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      const m = localStorage.getItem('friday_mode');
-      if (m === 'thread' || m === 'cockpit') return m;
-    }
-    return 'cockpit';
-  });
-
-  // Listen for mode changes from HudTopbar
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.detail === 'cockpit' || e.detail === 'thread') setMode(e.detail);
-    };
-    window.addEventListener('friday-mode', handler);
-    return () => window.removeEventListener('friday-mode', handler);
-  }, []);
-
   const handleUnlock = useCallback(() => {
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('friday_booted')) {
       setAppState('ready');
@@ -45,38 +28,52 @@ export default function FridayApp() {
   if (appState === 'locked')  return <AppErrorBoundary><LockScreen   onUnlock={handleUnlock} /></AppErrorBoundary>;
   if (appState === 'booting') return <AppErrorBoundary><BootSequence onComplete={handleBooted} /></AppErrorBoundary>;
 
+  // Unified split view — command grid left, neural thread right
   return (
     <AppErrorBoundary>
-      <div style={{ height: '100%', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: '100%', overflow: 'hidden', gap: 0 }}>
 
-        {/* COCKPIT mode — widget grid */}
-        {mode === 'cockpit' && (
-          <div style={{ height: '100%', overflow: 'auto' }}>
-            <Dashboard />
-          </div>
-        )}
+        {/* Left — cockpit widget grid */}
+        <div style={{ flex: '1 1 0', minWidth: 0, height: '100%', overflow: 'auto', borderRight: '1px solid rgba(0,212,255,0.08)' }}>
+          <Dashboard />
+        </div>
 
-        {/* THREAD mode — agent chat */}
-        {mode === 'thread' && (
+        {/* Right — neural thread */}
+        <div style={{
+          width: 360, flexShrink: 0,
+          height: '100%', display: 'flex', flexDirection: 'column',
+          background: 'rgba(2,8,12,0.6)',
+        }}>
+          {/* Thread header */}
           <div style={{
-            height: '100%', display: 'flex', flexDirection: 'column',
-            padding: '16px 20px',
+            padding: '10px 14px 8px',
+            borderBottom: '1px solid rgba(0,212,255,0.08)',
+            flexShrink: 0,
           }}>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{
-                fontFamily: 'var(--font-hud)', fontSize: 8,
-                letterSpacing: 4, color: 'rgba(0,212,255,0.4)',
-              }}>NEURAL THREAD — DIRECT COMMS</div>
-              <div style={{
-                fontFamily: 'var(--font-mono)', fontSize: 9,
-                color: 'rgba(0,212,255,0.25)', marginTop: 3,
-              }}>Route queries to BOB · RILEY · SUSAN · DOUG · MAYA</div>
+            <div style={{
+              fontFamily: 'var(--font-hud)', fontSize: 8,
+              letterSpacing: 4, color: '#00d4ff',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{
+                width: 5, height: 5, borderRadius: '50%',
+                background: '#00d4ff', boxShadow: '0 0 5px #00d4ff',
+                animation: 'pulse-dot 2s ease-in-out infinite',
+                display: 'inline-block',
+              }} />
+              NEURAL THREAD
             </div>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <ChatUI />
-            </div>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 8,
+              color: 'rgba(0,212,255,0.28)', marginTop: 3, letterSpacing: 1,
+            }}>BOB · RILEY · SUSAN · DOUG · MAYA</div>
           </div>
-        )}
+
+          {/* Chat panel */}
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <ChatUI />
+          </div>
+        </div>
 
       </div>
     </AppErrorBoundary>

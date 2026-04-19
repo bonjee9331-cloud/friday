@@ -75,40 +75,14 @@ export default function HudTopbar({ mode, onModeChange }) {
         INTEL LIVE
       </div>
 
-      {/* COCKPIT / THREAD toggle — only on main page */}
-      {isHome && onModeChange && (
+      {/* Current page label */}
+      {isHome && (
         <>
           <div style={{ width: 1, height: 18, background: 'rgba(0,212,255,0.10)', marginRight: 12 }} />
           <div style={{
-            display: 'flex',
-            background: 'rgba(0,212,255,0.04)',
-            border: '1px solid rgba(0,212,255,0.13)',
-            borderRadius: 3,
-            overflow: 'hidden',
-            flexShrink: 0, marginRight: 12,
-          }}>
-            {['COCKPIT', 'THREAD'].map((m, idx) => {
-              const active = mode === m.toLowerCase();
-              return (
-                <button
-                  key={m}
-                  onClick={() => onModeChange(m.toLowerCase())}
-                  style={{
-                    padding: '5px 13px',
-                    background: active ? 'rgba(0,212,255,0.13)' : 'transparent',
-                    border: 'none',
-                    borderRight: idx === 0 ? '1px solid rgba(0,212,255,0.10)' : 'none',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--font-hud)',
-                    fontSize: 7, letterSpacing: 2.5,
-                    color: active ? '#00d4ff' : 'rgba(0,212,255,0.32)',
-                    textShadow: active ? '0 0 10px rgba(0,212,255,0.5)' : 'none',
-                    transition: 'all 0.14s',
-                  }}
-                >{m}</button>
-              );
-            })}
-          </div>
+            fontFamily: 'var(--font-hud)', fontSize: 7, letterSpacing: 3,
+            color: 'rgba(0,212,255,0.35)', marginRight: 12, flexShrink: 0,
+          }}>COMMAND · NEURAL</div>
         </>
       )}
 
