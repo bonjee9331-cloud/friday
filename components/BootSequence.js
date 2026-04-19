@@ -2,88 +2,81 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-const ACCENT       = '#ff6b35';
-const ACCENT_DIM   = 'rgba(255,107,53,0.55)';
-const ACCENT_FAINT = 'rgba(255,107,53,0.12)';
-
-const MUSIC_ID       = 'XXswgVBbTjU';
-const MUSIC_START    = 200;
-const MUSIC_END      = 243;
-const MUSIC_DURATION = (MUSIC_END - MUSIC_START) * 1000;
-const FADE_DURATION  = 2500;
-const START_VOL      = 70;
-
 const CHECKS = [
-  'INITIALISING FRIDAY...',
-  'Sales Floor         [ ONLINE ]',
-  'Memory              [ ONLINE ]',
-  'Voice               [ ONLINE ]',
-  'Jobs                [ ONLINE ]',
-  'Fair Work           [ ACTIVE ]',
-  'ALL SYSTEMS NOMINAL',
+  { text: 'NEURAL NET',    status: 'CONNECTED',  colour: '#3dd68c' },
+  { text: 'SALES FLOOR',   status: 'ONLINE',     colour: '#3dd68c' },
+  { text: 'MEMORY',        status: 'SYNCED',     colour: '#3dd68c' },
+  { text: 'VOICE SYNTH',   status: 'READY',      colour: '#3dd68c' },
+  { text: 'JOB AUTOPILOT', status: 'RUNNING',    colour: '#3dd68c' },
+  { text: 'FAIR WORK',     status: 'ACTIVE',     colour: '#f59e0b' },
+  { text: 'AGENTS',        status: '5 ONLINE',   colour: '#3dd68c' },
+  { text: 'ALL SYSTEMS',   status: 'NOMINAL',    colour: '#00d4ff' },
 ];
 
+const VOICE_SCRIPT = "Good morning, Ben. All systems are online. FRIDAY is ready.";
+
+const MUSIC_ID    = 'XXswgVBbTjU';
+const MUSIC_START = 200;
+const MUSIC_END   = 243;
+const START_VOL   = 65;
+const FADE_DUR    = 2500;
+
 export default function BootSequence({ onComplete }) {
-  const canvasRef   = useRef(null);
-  const animRef     = useRef(null);
   const playerRef   = useRef(null);
-  const phaseRef    = useRef(0);
   const playerIdRef = useRef(`yt-${Math.random().toString(36).slice(2)}`);
+  const fadeToRef   = useRef(null);
+  const fadeIvRef   = useRef(null);
+  const finishRef   = useRef(null);
+  const speakRef    = useRef(null);
+  const doneRef     = useRef(null);
+  const hardRef     = useRef(null);
 
-  const fadeTimeoutRef  = useRef(null);
-  const fadeIntervalRef = useRef(null);
-  const finishRef       = useRef(null);
-  const speakRef        = useRef(null);
-  const doneRef         = useRef(null);
-  const hardStopRef     = useRef(null);
+  const [lines,       setLines]       = useState([]);
+  const [title,       setTitle]       = useState('');
+  const [subtitle,    setSubtitle]    = useState('');
+  const [musicDone,   setMusicDone]   = useState(false);
+  const [voiceDone,   setVoiceDone]   = useState(false);
+  const [voiceStart,  setVoiceStart]  = useState(false);
+  const [opacity,     setOpacity]     = useState(1);
+  const [statusMsg,   setStatusMsg]   = useState('');
 
-  const [phase,        setPhase]        = useState(0);
-  const [lines,        setLines]        = useState([]);
-  const [weather,      setWeather]      = useState(null);
-  const [news,         setNews]         = useState([]);
-  const [showData,     setShowData]     = useState(false);
-  const [musicDone,    setMusicDone]    = useState(false);
-  const [briefingDone, setBriefingDone] = useState(false);
-  const [voiceStarted, setVoiceStarted] = useState(false);
-  const [statusMsg,    setStatusMsg]    = useState('');
-  const [opacity,      setOpacity]      = useState(1);
-
-  // ── mark music finished (idempotent) ─────────────────────────────────────
-  const markMusicDone = useCallback(() => setMusicDone(prev => prev || true), []);
-
-  // ── fetch data ────────────────────────────────────────────────────────────
+  // ── title typewriter ─────────────────────────────────────────
   useEffect(() => {
-    let live = true;
-    fetch('/api/weather').then(r => r.json()).then(d => { if (live) setWeather(d); }).catch(() => {});
-    fetch('/api/news').then(r => r.json()).then(d => { if (live && d?.headlines) setNews(d.headlines); }).catch(() => {});
-    return () => { live = false; };
+    const full = 'FRIDAY';
+    const sub  = 'PERSONAL AI SYSTEM · INITIALISING';
+    let i = 0;
+    const iv = setInterval(() => {
+      i++;
+      setTitle(full.slice(0, i));
+      if (i >= full.length) {
+        clearInterval(iv);
+        let j = 0;
+        const iv2 = setInterval(() => {
+          j++;
+          setSubtitle(sub.slice(0, j));
+          if (j >= sub.length) clearInterval(iv2);
+        }, 22);
+      }
+    }, 60);
+    return () => clearInterval(iv);
   }, []);
 
-  // ── boot checklist (staggered) ────────────────────────────────────────────
+  // ── boot checklist ────────────────────────────────────────────
   useEffect(() => {
-    const timers = CHECKS.map((line, i) =>
-      setTimeout(() => setLines(prev => [...prev, line]), 600 + i * 340)
+    const timers = CHECKS.map((c, i) =>
+      setTimeout(() => setLines(prev => [...prev, c]), 700 + i * 360)
     );
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  // ── phases ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    const t = [
-      setTimeout(() => { phaseRef.current = 1; setPhase(1); }, 800),
-      setTimeout(() => { phaseRef.current = 2; setPhase(2); }, 2500),
-      setTimeout(() => { phaseRef.current = 3; setPhase(3); }, 5000),
-      setTimeout(() => { phaseRef.current = 4; setPhase(4); setShowData(true); }, 8000),
-    ];
-    return () => t.forEach(clearTimeout);
-  }, []);
+  // ── YouTube music ─────────────────────────────────────────────
+  const markMusicDone = useCallback(() => setMusicDone(prev => prev || true), []);
 
-  // ── YouTube music ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
     let cancelled = false;
 
-    const setupPlayer = () => {
+    const setup = () => {
       if (cancelled || playerRef.current || !window.YT?.Player) return;
       const el = document.getElementById(playerIdRef.current);
       if (!el) return;
@@ -97,23 +90,24 @@ export default function BootSequence({ onComplete }) {
             try { e.target.setVolume(START_VOL); e.target.seekTo(MUSIC_START, true); e.target.playVideo(); }
             catch { markMusicDone(); return; }
 
-            fadeTimeoutRef.current = setTimeout(() => {
-              let vol = START_VOL;
-              fadeIntervalRef.current = setInterval(() => {
-                vol -= 5;
-                try { playerRef.current?.setVolume(Math.max(0, vol)); } catch {}
-                if (vol <= 0) {
-                  clearInterval(fadeIntervalRef.current);
+            const dur = (MUSIC_END - MUSIC_START) * 1000;
+            fadeToRef.current = setTimeout(() => {
+              let v = START_VOL;
+              fadeIvRef.current = setInterval(() => {
+                v -= 4;
+                try { playerRef.current?.setVolume(Math.max(0, v)); } catch {}
+                if (v <= 0) {
+                  clearInterval(fadeIvRef.current);
                   try { playerRef.current?.stopVideo(); } catch {}
                   markMusicDone();
                 }
-              }, 180);
-            }, Math.max(0, MUSIC_DURATION - FADE_DURATION));
+              }, 160);
+            }, Math.max(0, dur - FADE_DUR));
 
             finishRef.current = setTimeout(() => {
               try { playerRef.current?.stopVideo(); } catch {}
               markMusicDone();
-            }, MUSIC_DURATION + 600);
+            }, dur + 600);
           },
           onError: () => markMusicDone(),
           onStateChange(e) { if (e.data === 0) markMusicDone(); },
@@ -122,45 +116,31 @@ export default function BootSequence({ onComplete }) {
     };
 
     if (window.YT?.Player) {
-      setupPlayer();
+      setup();
     } else {
       if (!document.getElementById('yt-iframe-api')) {
         const s = document.createElement('script');
-        s.id  = 'yt-iframe-api';
+        s.id = 'yt-iframe-api';
         s.src = 'https://www.youtube.com/iframe_api';
         document.body.appendChild(s);
       }
       const prev = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') prev(); setupPlayer(); };
+      window.onYouTubeIframeAPIReady = () => { if (typeof prev === 'function') prev(); setup(); };
     }
 
     return () => { cancelled = true; };
   }, [markMusicDone]);
 
-  // ── speak briefing ────────────────────────────────────────────────────────
-  const speakBrowserFallback = useCallback((text) => new Promise(resolve => {
-    if (!window.speechSynthesis || !text?.trim()) { resolve(); return; }
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.onend = u.onerror = () => resolve();
-    const voices = window.speechSynthesis.getVoices();
-    const v = voices.find(x => /en-au|en-gb/i.test(x.lang)) || voices[0];
-    if (v) u.voice = v;
-    window.speechSynthesis.speak(u);
-  }), []);
-
+  // ── speak via ElevenLabs ──────────────────────────────────────
   const speak = useCallback(async (text) => {
-    if (voiceStarted) return;
-    setVoiceStarted(true);
-    if (!text?.trim()) { setBriefingDone(true); return; }
-
+    if (!text?.trim()) { setVoiceDone(true); return; }
     try {
       const res = await fetch('/api/friday/voice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-      if (!res.ok) throw new Error('voice api failed');
+      if (!res.ok) throw new Error('voice api');
       const buf = await res.arrayBuffer();
       const AC  = window.AudioContext || window.webkitAudioContext;
       if (!AC) throw new Error('no audio ctx');
@@ -169,289 +149,197 @@ export default function BootSequence({ onComplete }) {
       src.buffer = await ac.decodeAudioData(buf.slice(0));
       src.connect(ac.destination);
       src.start(0);
-      src.onended = () => { setBriefingDone(true); ac.close().catch(() => {}); };
+      src.onended = () => { setVoiceDone(true); ac.close().catch(() => {}); };
     } catch {
-      await speakBrowserFallback(text);
-      setBriefingDone(true);
+      // Browser fallback
+      try {
+        if (window.speechSynthesis) {
+          const u = new SpeechSynthesisUtterance(text);
+          u.onend = u.onerror = () => setVoiceDone(true);
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(u);
+        } else setVoiceDone(true);
+      } catch { setVoiceDone(true); }
     }
-  }, [speakBrowserFallback, voiceStarted]);
+  }, []);
 
-  // ── trigger speak when music done + phase 4 ───────────────────────────────
+  // ── trigger speak after music + checks done ───────────────────
   useEffect(() => {
-    if (phase < 4 || !musicDone || voiceStarted) return;
+    if (!musicDone || voiceStart || lines.length < CHECKS.length) return;
+    setVoiceStart(true);
     setStatusMsg('DELIVERING MORNING BRIEFING...');
-
     speakRef.current = setTimeout(async () => {
       try {
         const r = await fetch('/api/briefing');
         const d = await r.json();
-        await speak(d?.briefing || 'Good morning Ben. All systems are online.');
+        await speak(d?.briefing || VOICE_SCRIPT);
       } catch {
-        await speak('Good morning Ben. All systems are online.');
+        await speak(VOICE_SCRIPT);
       }
-    }, 400);
-
+    }, 500);
     return () => clearTimeout(speakRef.current);
-  }, [phase, musicDone, voiceStarted, speak]);
+  }, [musicDone, voiceStart, lines.length, speak]);
 
-  // ── complete when briefing done ───────────────────────────────────────────
+  // ── complete when voice done ──────────────────────────────────
   useEffect(() => {
-    if (!briefingDone || phase < 4) return;
-    setStatusMsg('BRIEFING COMPLETE — LAUNCHING FRIDAY');
+    if (!voiceDone) return;
+    setStatusMsg('FRIDAY ONLINE — LAUNCHING');
     doneRef.current = setTimeout(() => {
       setOpacity(0);
-      setTimeout(() => { sessionStorage.setItem('friday_booted', '1'); onComplete(); }, 600);
-    }, 1200);
+      setTimeout(() => {
+        sessionStorage.setItem('friday_booted', '1');
+        onComplete();
+      }, 700);
+    }, 1000);
     return () => clearTimeout(doneRef.current);
-  }, [briefingDone, phase, onComplete]);
+  }, [voiceDone, onComplete]);
 
-  // ── hard stop at 50s ──────────────────────────────────────────────────────
+  // ── hard stop at 55s ──────────────────────────────────────────
   useEffect(() => {
-    hardStopRef.current = setTimeout(() => setBriefingDone(true), 50000);
-    return () => clearTimeout(hardStopRef.current);
+    hardRef.current = setTimeout(() => setVoiceDone(true), 55000);
+    return () => clearTimeout(hardRef.current);
   }, []);
 
-  // ── canvas animation ──────────────────────────────────────────────────────
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let t = 0;
-    let w = (canvas.width  = window.innerWidth);
-    let h = (canvas.height = window.innerHeight);
-    const resize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
-    window.addEventListener('resize', resize);
-
-    const drawHexGrid = () => {
-      const HEX = 38, cx = w / 2, cy = h / 2;
-      const cols = Math.ceil(w / (HEX * 1.5)) + 2;
-      const rows = Math.ceil(h / (HEX * 1.732)) + 2;
-      for (let col = -1; col < cols; col++) {
-        for (let row = -1; row < rows; row++) {
-          const px = col * HEX * 1.5;
-          const py = row * HEX * 1.732 + (col % 2 ? HEX * 0.866 : 0);
-          const dist = Math.hypot(px - cx, py - cy);
-          const pulse = Math.sin(t * 0.008 - dist * 0.005) * 0.5 + 0.5;
-          ctx.strokeStyle = `rgba(255,107,53,${0.028 + pulse * 0.022})`;
-          ctx.lineWidth = 0.5;
-          ctx.beginPath();
-          for (let k = 0; k < 6; k++) {
-            const a = (k * Math.PI) / 3;
-            const hx = px + HEX * 0.82 * Math.cos(a);
-            const hy = py + HEX * 0.82 * Math.sin(a);
-            k === 0 ? ctx.moveTo(hx, hy) : ctx.lineTo(hx, hy);
-          }
-          ctx.closePath();
-          ctx.stroke();
-        }
-      }
-    };
-
-    const drawGlobe = () => {
-      const cx = w / 2, cy = h / 2;
-      const R  = Math.min(w, h) * 0.29;
-      const spin = t * 0.004;
-      ctx.save();
-      ctx.translate(cx, cy);
-      for (let lat = -75; lat <= 75; lat += 25) {
-        const phi = (lat * Math.PI) / 180;
-        const r2d = R * Math.cos(phi);
-        const y2d = R * Math.sin(phi);
-        ctx.strokeStyle = 'rgba(255,107,53,0.11)';
-        ctx.lineWidth = 0.7;
-        ctx.beginPath();
-        ctx.ellipse(0, y2d, r2d, r2d * 0.18, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      for (let lon = 0; lon < 180; lon += 30) {
-        [spin + (lon * Math.PI) / 180, spin + (lon * Math.PI) / 180 + Math.PI / 2].forEach(theta => {
-          ctx.strokeStyle = 'rgba(255,107,53,0.09)';
-          ctx.lineWidth = 0.7;
-          ctx.beginPath();
-          for (let a = 0; a <= Math.PI * 2; a += 0.05) {
-            const x = R * Math.sin(a) * Math.cos(theta);
-            const y = -R * Math.cos(a);
-            a === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-        });
-      }
-      ctx.strokeStyle = 'rgba(255,107,53,0.2)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, R, R * 0.18, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    };
-
-    const drawOrb = () => {
-      const cx = w / 2, cy = h / 2;
-      const pulse = Math.sin(t * 0.05) * 0.12 + 1;
-      const R = 28 * pulse;
-
-      const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 3.5);
-      glow.addColorStop(0, 'rgba(255,107,53,0.38)');
-      glow.addColorStop(0.4, 'rgba(255,107,53,0.07)');
-      glow.addColorStop(1, 'rgba(255,107,53,0)');
-      ctx.fillStyle = glow;
-      ctx.beginPath(); ctx.arc(cx, cy, R * 3.5, 0, Math.PI * 2); ctx.fill();
-
-      const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-      core.addColorStop(0, '#fff8f5');
-      core.addColorStop(0.3, ACCENT);
-      core.addColorStop(1, 'rgba(255,107,53,0.25)');
-      ctx.fillStyle = core;
-      ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-
-      ctx.strokeStyle = ACCENT_DIM; ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
-      ctx.beginPath(); ctx.ellipse(cx, cy, 70, 20, t * 0.01, 0, Math.PI * 2); ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(255,107,53,0.28)'; ctx.lineWidth = 0.8; ctx.setLineDash([2, 8]);
-      ctx.beginPath(); ctx.ellipse(cx, cy, 95, 28, -t * 0.008 + 0.8, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
-
-      const nx = cx + 70 * Math.cos(t * 0.022);
-      const ny = cy + 20 * Math.sin(t * 0.022);
-      ctx.fillStyle = ACCENT; ctx.shadowColor = ACCENT; ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.arc(nx, ny, 3.5, 0, Math.PI * 2); ctx.fill();
-      ctx.shadowBlur = 0;
-    };
-
-    const draw = () => {
-      t++;
-      const ph = phaseRef.current;
-      ctx.fillStyle = ph < 2 ? 'rgba(11,13,18,0.35)' : 'rgba(11,13,18,0.16)';
-      ctx.fillRect(0, 0, w, h);
-
-      if (ph >= 1) drawHexGrid();
-      drawGlobe();
-      drawOrb();
-
-      // corner brackets
-      const bLen = 28;
-      ctx.strokeStyle = ACCENT_DIM; ctx.lineWidth = 1.5;
-      [[0,0,1,1],[w,0,-1,1],[0,h,1,-1],[w,h,-1,-1]].forEach(([bx,by,dx,dy]) => {
-        ctx.beginPath();
-        ctx.moveTo(bx + dx*bLen, by); ctx.lineTo(bx, by); ctx.lineTo(bx, by + dy*bLen);
-        ctx.stroke();
-      });
-
-      // clock
-      const ts = new Date().toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
-      ctx.font = '300 11px monospace'; ctx.fillStyle = ACCENT_DIM;
-      ctx.textAlign = 'right'; ctx.fillText(ts, w - 20, h - 18); ctx.textAlign = 'left';
-
-      // title (phases 1+)
-      if (ph >= 1) {
-        const yPos = ph >= 3 ? 58 : h / 2 - 60;
-        ctx.font = `300 ${ph >= 2 ? '36' : '46'}px monospace`;
-        ctx.fillStyle = ACCENT; ctx.shadowColor = ACCENT; ctx.shadowBlur = 30;
-        ctx.textAlign = 'center'; ctx.fillText('FRIDAY', w / 2, yPos); ctx.shadowBlur = 0;
-        ctx.font = '300 10px monospace'; ctx.fillStyle = ACCENT_DIM;
-        ctx.fillText('PERSONAL AI SYSTEM', w / 2, yPos + 22); ctx.textAlign = 'left';
-      }
-
-      animRef.current = requestAnimationFrame(draw);
-    };
-
-    draw();
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-      window.removeEventListener('resize', resize);
-    };
-  }, []);
-
-  // ── cleanup ───────────────────────────────────────────────────────────────
+  // ── cleanup ───────────────────────────────────────────────────
   useEffect(() => () => {
-    [fadeTimeoutRef, fadeIntervalRef, finishRef, speakRef, doneRef, hardStopRef].forEach(r => {
-      if (r.current) (r.current.constructor === Number ? clearTimeout : clearTimeout)(r.current);
+    [fadeToRef, fadeIvRef, finishRef, speakRef, doneRef, hardRef].forEach(r => {
+      if (r.current != null) clearTimeout(r.current);
     });
     try { playerRef.current?.destroy(); } catch {}
     try { window.speechSynthesis?.cancel(); } catch {}
   }, []);
 
-  const WMO = {0:'Clear',1:'Mostly Clear',2:'Partly Cloudy',3:'Overcast',45:'Foggy',51:'Drizzle',61:'Rain',65:'Heavy Rain',80:'Showers',95:'Storm'};
+  const handleSkip = () => {
+    setOpacity(0);
+    setTimeout(() => {
+      sessionStorage.setItem('friday_booted', '1');
+      onComplete();
+    }, 500);
+  };
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'#0b0d12', overflow:'hidden', fontFamily:'monospace', opacity, transition:'opacity 0.6s ease' }}>
-      <canvas ref={canvasRef} style={{ position:'absolute', inset:0 }} />
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 500,
+      background: '#020a0e',
+      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      opacity, transition: 'opacity 0.7s ease',
+    }}>
+      {/* Hidden YouTube player */}
+      <div id={playerIdRef.current} style={{ position: 'absolute', width: 1, height: 1, opacity: 0.01, top: 0, left: 0, pointerEvents: 'none' }} />
 
-      {/* hidden YouTube player */}
-      <div id={playerIdRef.current} style={{ position:'absolute', width:1, height:1, opacity:0.01, top:0, left:0, pointerEvents:'none' }} />
+      {/* SKIP button */}
+      <button
+        onClick={handleSkip}
+        style={{
+          position: 'absolute', top: 16, right: 20,
+          background: 'transparent',
+          border: '1px solid rgba(0,212,255,0.2)',
+          color: 'rgba(0,212,255,0.4)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9, letterSpacing: 3,
+          padding: '5px 12px',
+          cursor: 'pointer', borderRadius: 2,
+          transition: 'all 0.15s',
+          zIndex: 10,
+        }}
+        onMouseEnter={e => { e.target.style.color = '#00d4ff'; e.target.style.borderColor = 'rgba(0,212,255,0.5)'; }}
+        onMouseLeave={e => { e.target.style.color = 'rgba(0,212,255,0.4)'; e.target.style.borderColor = 'rgba(0,212,255,0.2)'; }}
+      >
+        SKIP ›
+      </button>
 
-      {/* boot log — left side */}
+      {/* Corner brackets */}
       <div style={{
-        position:'absolute', top:90, left:44, zIndex:10,
-        fontSize:11, letterSpacing:2, lineHeight:2, color:ACCENT_DIM,
-        opacity: phase >= 1 ? 1 : 0, transition:'opacity 1s',
-      }}>
-        {lines.map((line, i) => {
-          const good = line.includes('[ ONLINE ]') || line.includes('[ ACTIVE ]') || line.includes('NOMINAL');
-          return (
-            <div key={i} style={{ display:'flex', gap:10, color: good ? '#3dd68c' : ACCENT_DIM, animation:'slideIn 0.25s ease-out' }}>
-              <span style={{ color:ACCENT_FAINT }}>›</span>
-              <span>{line}</span>
-              {good && line !== 'ALL SYSTEMS NOMINAL' && <span style={{ marginLeft:'auto', paddingLeft:16, color:'#3dd68c' }}>✓</span>}
-            </div>
-          );
-        })}
-      </div>
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: `
+          linear-gradient(to right, #00d4ff 30px, transparent 30px) top left / 30px 1px no-repeat,
+          linear-gradient(to bottom,#00d4ff 30px, transparent 30px) top left / 1px 30px no-repeat,
+          linear-gradient(to left,  #00d4ff 30px, transparent 30px) top right / 30px 1px no-repeat,
+          linear-gradient(to bottom,#00d4ff 30px, transparent 30px) top right / 1px 30px no-repeat,
+          linear-gradient(to right, #00d4ff 30px, transparent 30px) bottom left / 30px 1px no-repeat,
+          linear-gradient(to top,   #00d4ff 30px, transparent 30px) bottom left / 1px 30px no-repeat,
+          linear-gradient(to left,  #00d4ff 30px, transparent 30px) bottom right / 30px 1px no-repeat,
+          linear-gradient(to top,   #00d4ff 30px, transparent 30px) bottom right / 1px 30px no-repeat
+        `,
+        opacity: 0.45,
+      }} />
 
-      {/* data panels — right side */}
-      {showData && (
-        <div style={{ position:'absolute', inset:0, zIndex:10, pointerEvents:'none' }}>
-          {/* weather */}
-          <div style={{
-            position:'absolute', top:90, right:44,
-            border:'1px solid rgba(255,107,53,0.25)', background:'rgba(11,13,18,0.88)',
-            padding:'16px 20px', borderRadius:4, color:ACCENT, minWidth:220,
-            animation:'slideInRight 0.8s ease-out',
-          }}>
-            <div style={{ fontSize:9, letterSpacing:4, marginBottom:10, color:ACCENT_DIM }}>HUA HIN WEATHER</div>
-            {weather ? (
-              <>
-                <div style={{ fontSize:34, fontWeight:100 }}>{weather.temp}°C</div>
-                <div style={{ fontSize:11, marginTop:4, color:ACCENT }}>{WMO[weather.code] || weather.desc}</div>
-                <div style={{ fontSize:10, marginTop:8, color:ACCENT_DIM }}>Feels {weather.feels}°C · Wind {weather.wind}km/h · Rain {weather.rain}%</div>
-              </>
-            ) : <div style={{ fontSize:10, color:ACCENT_DIM }}>LOADING...</div>}
-          </div>
+      {/* Scanlines */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.015) 2px, rgba(0,212,255,0.015) 4px)',
+      }} />
 
-          {/* news */}
-          <div style={{
-            position:'absolute', top:260, right:44,
-            border:'1px solid rgba(255,107,53,0.18)', background:'rgba(11,13,18,0.88)',
-            padding:'14px 18px', borderRadius:4, color:ACCENT, width:300,
-            animation:'slideInRight 1s ease-out',
-          }}>
-            <div style={{ fontSize:9, letterSpacing:4, marginBottom:10, color:ACCENT_DIM }}>LIVE HEADLINES</div>
-            {news.length ? news.slice(0, 5).map((h, i) => (
-              <div key={i} style={{
-                fontSize:10, lineHeight:1.6,
-                borderBottom: i < 4 ? '1px solid rgba(255,107,53,0.08)' : 'none',
-                paddingBottom:6, marginBottom:6, color:'rgba(255,180,140,0.85)',
-              }}>
-                <span style={{ color:ACCENT_FAINT, marginRight:6 }}>{i+1}.</span>{h}
-              </div>
-            )) : <div style={{ fontSize:10, color:ACCENT_DIM }}>LOADING...</div>}
-          </div>
+      {/* Main content: centred column */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32, position: 'relative', zIndex: 5 }}>
 
-          {/* status */}
-          {statusMsg && (
-            <div style={{
-              position:'absolute', bottom:60, left:'50%', transform:'translateX(-50%)',
-              fontSize:11, letterSpacing:3, color:'#3dd68c', whiteSpace:'nowrap',
-              animation:'pulse 2s infinite',
-            }}>{statusMsg}</div>
-          )}
+        {/* Arc reactor */}
+        <div className="arc-reactor">
+          <div className="arc-ring ring-1" />
+          <div className="arc-ring ring-2" />
+          <div className="arc-ring ring-3" />
+          <div className="arc-ring ring-4" />
+          <div className="arc-glow" />
+          <div className="arc-core" />
         </div>
-      )}
 
-      <style>{`
-        @keyframes slideIn      { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes slideInRight { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes pulse        { 0%,100%{opacity:0.6} 50%{opacity:1} }
-      `}</style>
+        {/* Title */}
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            fontFamily: 'var(--font-hud)',
+            fontSize: 44, fontWeight: 900,
+            letterSpacing: 16,
+            color: '#00d4ff',
+            textShadow: '0 0 40px rgba(0,212,255,0.7), 0 0 80px rgba(0,212,255,0.3)',
+            lineHeight: 1,
+            minHeight: 52,
+          }}>
+            {title}
+            {title.length < 6 && (
+              <span style={{ animation: 'blink-cursor 0.8s step-end infinite', color: 'rgba(0,212,255,0.7)' }}>_</span>
+            )}
+          </div>
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9, letterSpacing: 4,
+            color: 'rgba(0,212,255,0.4)',
+            marginTop: 8, minHeight: 14,
+          }}>{subtitle}</div>
+        </div>
+
+        {/* Boot checklist */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 4,
+          width: 320, minHeight: 160,
+        }}>
+          {lines.map((line, i) => (
+            <div key={i} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
+              animation: 'hudSlideIn 0.2s ease-out',
+            }}>
+              <span style={{ color: 'rgba(0,212,255,0.5)' }}>› {line.text}</span>
+              <span style={{
+                color: line.colour,
+                textShadow: `0 0 8px ${line.colour}`,
+                fontSize: 9, letterSpacing: 2,
+              }}>[ {line.status} ]</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Status message */}
+        <div style={{
+          fontFamily: 'var(--font-hud)',
+          fontSize: 8, letterSpacing: 3,
+          color: '#3dd68c',
+          minHeight: 14,
+          animation: statusMsg ? 'pulse-dot 2s ease-in-out infinite' : 'none',
+        }}>
+          {statusMsg}
+        </div>
+      </div>
     </div>
   );
 }

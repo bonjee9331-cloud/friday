@@ -4,442 +4,314 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 export default function LockScreen({ onUnlock }) {
   const canvasRef = useRef(null);
-  const animRef = useRef(null);
-  const recRef = useRef(null);
+  const animRef   = useRef(null);
+  const recRef    = useRef(null);
 
-  const [status, setStatus] = useState('CLICK ARM MICROPHONE TO BEGIN');
+  const [status,    setStatus]    = useState('AUTHENTICATION REQUIRED');
   const [unlocking, setUnlocking] = useState(false);
-  const [armed, setArmed] = useState(false);
-  const [heard, setHeard] = useState('');
-  const [textInput, setTextInput] = useState('');
+  const [armed,     setArmed]     = useState(false);
+  const [heard,     setHeard]     = useState('');
+  const [input,     setInput]     = useState('');
 
-  const doUnlock = useCallback(() => {
+  const doUnlock = useCallback(async () => {
     if (unlocking) return;
-
     setUnlocking(true);
-    setStatus('PASSPHRASE ACCEPTED - INITIALISING');
+    setStatus('IDENTITY CONFIRMED — INITIALISING');
 
     if (recRef.current) {
-      try {
-        recRef.current.onend = null;
-        recRef.current.stop();
-      } catch (_) {
-        // ignore
-      }
+      try { recRef.current.onend = null; recRef.current.stop(); } catch {}
     }
 
-    setTimeout(() => {
-      onUnlock();
-    }, 1800);
+    // ElevenLabs confirmation
+    try {
+      const res = await fetch('/api/friday/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: 'Identity confirmed. Welcome back, Ben.' }),
+      });
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        const AC  = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+          const ac  = new AC();
+          const src = ac.createBufferSource();
+          src.buffer = await ac.decodeAudioData(buf.slice(0));
+          src.connect(ac.destination);
+          src.start(0);
+          src.onended = () => { ac.close().catch(() => {}); onUnlock(); };
+          return;
+        }
+      }
+    } catch {}
+
+    setTimeout(onUnlock, 1800);
   }, [onUnlock, unlocking]);
 
-  const checkPhrase = useCallback(
-    (txt) => {
-      if (typeof txt !== 'string') return;
-
-      const t = txt.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
-
-      const matched =
-        t.includes('lets get biblical') ||
-        t.includes("let s get biblical") ||
-        t.includes('let us get biblical') ||
-        t.includes('get biblical') ||
-        t.includes('biblical');
-
-      if (matched) {
-        doUnlock();
-      }
-    },
-    [doUnlock]
-  );
+  const checkPhrase = useCallback((txt) => {
+    if (typeof txt !== 'string') return;
+    const t = txt.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (
+      t.includes('lets get biblical') ||
+      t.includes("let s get biblical") ||
+      t.includes('let us get biblical') ||
+      t.includes('get biblical') ||
+      t.includes('biblical')
+    ) doUnlock();
+  }, [doUnlock]);
 
   const armMic = useCallback(() => {
     if (typeof window === 'undefined') return;
-
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (!SR) {
-      setStatus('MIC NOT SUPPORTED - TYPE PASSPHRASE BELOW');
-      return;
-    }
+    if (!SR) { setStatus('VOICE UNAVAILABLE — TYPE BELOW'); return; }
 
     if (recRef.current) {
-      try {
-        recRef.current.onend = null;
-        recRef.current.stop();
-      } catch (_) {
-        // ignore
-      }
+      try { recRef.current.onend = null; recRef.current.stop(); } catch {}
       recRef.current = null;
     }
 
     const rec = new SR();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = 'en-AU';
-
-    rec.onstart = () => {
-      setArmed(true);
-      setStatus('LISTENING - SPEAK NOW');
-    };
-
-    rec.onerror = () => {
-      setArmed(false);
-      setStatus('MIC BLOCKED - ALLOW ACCESS OR TYPE BELOW');
-    };
-
+    rec.continuous = true; rec.interimResults = true; rec.lang = 'en-AU';
+    rec.onstart  = () => { setArmed(true); setStatus('LISTENING — SPEAK PASSPHRASE'); };
+    rec.onerror  = () => { setArmed(false); setStatus('MIC BLOCKED — ALLOW ACCESS OR TYPE BELOW'); };
     rec.onresult = (e) => {
-      const transcript = Array.from(e.results || [])
-        .map((r) => (r && r[0] && typeof r[0].transcript === 'string' ? r[0].transcript : ''))
-        .join(' ')
-        .trim();
-
-      setHeard(transcript.slice(-80));
-      checkPhrase(transcript);
+      const t = Array.from(e.results || [])
+        .map(r => r?.[0]?.transcript || '').join(' ').trim();
+      setHeard(t.slice(-80));
+      checkPhrase(t);
     };
-
     rec.onend = () => {
-      if (!unlocking) {
-        try {
-          rec.start();
-        } catch (_) {
-          setArmed(false);
-          setStatus('MIC STOPPED - CLICK ARM MICROPHONE AGAIN');
-        }
-      }
+      if (!unlocking) { try { rec.start(); } catch { setArmed(false); setStatus('MIC STOPPED — CLICK AGAIN'); } }
     };
-
     recRef.current = rec;
-
-    try {
-      rec.start();
-    } catch (_) {
-      setArmed(false);
-      setStatus('MIC ERROR - TYPE BELOW');
-    }
+    try { rec.start(); } catch { setArmed(false); setStatus('MIC ERROR — TYPE BELOW'); }
   }, [checkPhrase, unlocking]);
 
+  // Canvas background
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
     let t = 0;
-    let w = (canvas.width = window.innerWidth);
-    let h = (canvas.height = window.innerHeight);
-
-    const resize = () => {
-      w = canvas.width = window.innerWidth;
-      h = canvas.height = window.innerHeight;
-    };
-
+    let w = canvas.width  = window.innerWidth;
+    let h = canvas.height = window.innerHeight;
+    const resize = () => { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; };
     window.addEventListener('resize', resize);
 
-    const particles = Array.from({ length: 60 }, () => ({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      vy: -(0.2 + Math.random() * 0.4),
-      size: 1 + Math.random() * 2,
-      alpha: 0.1 + Math.random() * 0.3,
+    const particles = Array.from({ length: 55 }, () => ({
+      x: Math.random() * w, y: Math.random() * h,
+      vy: -(0.15 + Math.random() * 0.35),
+      size: 1 + Math.random() * 1.5,
+      alpha: 0.08 + Math.random() * 0.22,
     }));
 
     const draw = () => {
-      t += 1;
-
-      ctx.fillStyle = 'rgba(0,0,0,0.14)';
+      t++;
+      ctx.fillStyle = 'rgba(2,10,14,0.15)';
       ctx.fillRect(0, 0, w, h);
 
-      const cx = w / 2;
-      const cy = h / 2;
+      const cx = w / 2, cy = h / 2;
 
-      for (let i = 0; i < 7; i += 1) {
-        const r = 80 + i * 70 + Math.sin(t * 0.018 + i) * 10;
-        const alp = 0.05 + 0.03 * Math.sin(t * 0.025 + i);
-
-        ctx.strokeStyle = `rgba(0,180,255,${alp})`;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([8, 14]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      ctx.setLineDash([]);
-
-      const HEX = 30;
-      const gc = Math.ceil(w / (HEX * 1.5)) + 2;
-      const gr = Math.ceil(h / (HEX * 1.732)) + 2;
-
-      for (let col = -1; col < gc; col += 1) {
-        for (let row = -1; row < gr; row += 1) {
+      // Hex grid
+      const HEX = 32, gc = Math.ceil(w / (HEX * 1.5)) + 2, gr = Math.ceil(h / (HEX * 1.732)) + 2;
+      for (let col = -1; col < gc; col++) {
+        for (let row = -1; row < gr; row++) {
           const px = col * HEX * 1.5;
           const py = row * HEX * 1.732 + (col % 2 ? HEX * 0.866 : 0);
           const dist = Math.hypot(px - cx, py - cy);
-          const pulse = Math.sin(t * 0.012 - dist * 0.008) * 0.5 + 0.5;
-
-          ctx.strokeStyle = `rgba(0,100,255,${0.02 + pulse * 0.04})`;
+          const pulse = Math.sin(t * 0.012 - dist * 0.007) * 0.5 + 0.5;
+          ctx.strokeStyle = `rgba(0,212,255,${0.018 + pulse * 0.03})`;
           ctx.lineWidth = 0.5;
           ctx.beginPath();
-
-          for (let k = 0; k < 6; k += 1) {
+          for (let k = 0; k < 6; k++) {
             const ang = (k * Math.PI) / 3;
-            const hx = px + HEX * 0.85 * Math.cos(ang);
-            const hy = py + HEX * 0.85 * Math.sin(ang);
-
-            if (k === 0) ctx.moveTo(hx, hy);
-            else ctx.lineTo(hx, hy);
+            const hx = px + HEX * 0.84 * Math.cos(ang);
+            const hy = py + HEX * 0.84 * Math.sin(ang);
+            k === 0 ? ctx.moveTo(hx, hy) : ctx.lineTo(hx, hy);
           }
-
-          ctx.closePath();
-          ctx.stroke();
+          ctx.closePath(); ctx.stroke();
         }
       }
 
-      particles.forEach((p) => {
+      // Concentric rings
+      for (let i = 0; i < 6; i++) {
+        const r = 100 + i * 80 + Math.sin(t * 0.016 + i) * 8;
+        const alp = 0.04 + 0.025 * Math.sin(t * 0.022 + i);
+        ctx.strokeStyle = `rgba(0,212,255,${alp})`;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([6, 14]); ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      // Particles
+      particles.forEach(p => {
         p.y += p.vy;
-        if (p.y < 0) {
-          p.y = h;
-          p.x = Math.random() * w;
-        }
-        ctx.fillStyle = `rgba(0,200,255,${p.alpha})`;
+        if (p.y < 0) { p.y = h; p.x = Math.random() * w; }
+        ctx.fillStyle = `rgba(0,212,255,${p.alpha})`;
         ctx.fillRect(p.x, p.y, p.size, p.size * 3);
-      });
-
-      const bL = 26;
-      ctx.strokeStyle = 'rgba(0,180,255,0.45)';
-      ctx.lineWidth = 1.5;
-
-      [
-        [0, 0, 1, 1],
-        [w, 0, -1, 1],
-        [0, h, 1, -1],
-        [w, h, -1, -1],
-      ].forEach(([bx, by, dx, dy]) => {
-        ctx.beginPath();
-        ctx.moveTo(bx + dx * bL, by);
-        ctx.lineTo(bx, by);
-        ctx.lineTo(bx, by + dy * bL);
-        ctx.stroke();
       });
 
       animRef.current = requestAnimationFrame(draw);
     };
-
     draw();
-
     return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
+      cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (recRef.current) {
-        try {
-          recRef.current.onend = null;
-          recRef.current.stop();
-        } catch (_) {
-          // ignore
-        }
-      }
-    };
+  useEffect(() => () => {
+    try { recRef.current?.stop(); } catch {}
   }, []);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: unlocking ? '#001428' : '#000010',
-        overflow: 'hidden',
-        transition: 'background 1.5s',
-      }}
-    >
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 500,
+      background: unlocking ? '#001428' : '#020a0e',
+      overflow: 'hidden', transition: 'background 1.5s',
+    }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0 }} />
 
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 10,
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'monospace',
-          color: '#00b4ff',
-        }}
-      >
-        <div style={{ fontSize: 10, letterSpacing: 8, color: 'rgba(0,180,255,0.4)', marginBottom: 10 }}>
-          FRIDAY OS v2.0
+      {/* Scanlines */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,212,255,0.012) 2px, rgba(0,212,255,0.012) 4px)',
+      }} />
+
+      {/* Content */}
+      <div style={{
+        position: 'relative', zIndex: 10,
+        height: '100%', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center', gap: 22,
+        fontFamily: 'var(--font-mono)', color: '#00d4ff',
+      }}>
+
+        {/* Version tag */}
+        <div style={{ fontFamily: 'var(--font-hud)', fontSize: 8, letterSpacing: 6, color: 'rgba(0,212,255,0.28)' }}>
+          FRIDAY OS · v8.0
         </div>
 
-        <div
-          style={{
-            fontSize: 52,
-            fontWeight: 100,
-            letterSpacing: 20,
-            textShadow: '0 0 40px rgba(0,180,255,0.9)',
-            marginBottom: 6,
-          }}
-        >
-          FRIDAY
+        {/* Arc reactor instead of padlock */}
+        <div className="arc-reactor" style={{ opacity: unlocking ? 0.5 : 1, transition: 'opacity 1s' }}>
+          <div className="arc-ring ring-1" />
+          <div className="arc-ring ring-2" />
+          <div className="arc-ring ring-3" />
+          <div className="arc-ring ring-4" />
+          <div className="arc-glow" />
+          <div className="arc-core" />
         </div>
 
-        <div
-          style={{
-            fontSize: 10,
-            letterSpacing: 5,
-            color: 'rgba(0,180,255,0.5)',
-            marginBottom: 50,
-          }}
-        >
-          PERSONAL AI SYSTEM - SECURE MODE
+        {/* Title */}
+        <div style={{
+          fontFamily: 'var(--font-hud)', fontSize: 46, fontWeight: 900,
+          letterSpacing: 18, color: '#00d4ff',
+          textShadow: '0 0 40px rgba(0,212,255,0.8)',
+          lineHeight: 1, marginBottom: -8,
+        }}>FRIDAY</div>
+
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: 5, color: 'rgba(0,212,255,0.4)' }}>
+          SECURE MODE — AUTHENTICATION REQUIRED
         </div>
 
-        <div style={{ marginBottom: 28, opacity: unlocking ? 0 : 1, transition: 'opacity 1s' }}>
-          <svg width="38" height="48" viewBox="0 0 38 48" fill="none">
-            <rect x="3" y="21" width="32" height="23" rx="3" stroke="#00b4ff" strokeWidth="1.5" />
-            <path d="M9 21V14a10 10 0 0 1 20 0v7" stroke="#00b4ff" strokeWidth="1.5" fill="none" />
-            <circle cx="19" cy="32" r="3" fill="#00b4ff" />
-            <line x1="19" y1="32" x2="19" y2="38" stroke="#00b4ff" strokeWidth="1.5" />
-          </svg>
-        </div>
-
-        <div
-          style={{
-            fontSize: 11,
-            letterSpacing: 4,
-            color: unlocking ? '#00ffaa' : armed ? '#00eaff' : '#00b4ff',
-            marginBottom: 12,
-            transition: 'color 0.5s',
-            textAlign: 'center',
-          }}
-        >
+        {/* Status */}
+        <div style={{
+          fontFamily: 'var(--font-hud)', fontSize: 10, letterSpacing: 3,
+          color: unlocking ? '#3dd68c' : armed ? '#00eaff' : 'rgba(0,212,255,0.7)',
+          transition: 'color 0.4s', textAlign: 'center', maxWidth: 320,
+        }}>
           {status}
         </div>
 
+        {/* Heard transcript */}
         {heard && !unlocking && (
-          <div
-            style={{
-              fontSize: 10,
-              color: 'rgba(0,180,255,0.5)',
-              marginBottom: 10,
-              maxWidth: 340,
-              textAlign: 'center',
-              letterSpacing: 1,
-            }}
-          >
-            LAST HEARD: "{heard.slice(-50)}"
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9,
+            color: 'rgba(0,212,255,0.4)', maxWidth: 300,
+            textAlign: 'center', letterSpacing: 1,
+          }}>
+            HEARD: "{heard.slice(-60)}"
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 4, marginBottom: 32, alignItems: 'center', height: 30 }}>
+        {/* Voice bars */}
+        <div style={{ display: 'flex', gap: 3, alignItems: 'center', height: 24 }}>
           {[1, 1.8, 1.2, 2.5, 1.5, 2.2, 1, 1.8, 2.4, 1.3, 2, 1.6].map((v, i) => (
-            <div
-              key={i}
-              style={{
-                width: 3,
-                background: armed
-                  ? 'linear-gradient(to top,#00ffaa,#00eaff)'
-                  : 'linear-gradient(to top,#00b4ff,#00eaff)',
-                borderRadius: 2,
-                opacity: 0.7,
-                animationName: 'wave',
-                animationDuration: `${0.4 + i * 0.07}s`,
-                animationIterationCount: 'infinite',
-                animationDirection: 'alternate',
-                animationTimingFunction: 'ease-in-out',
-                height: `${v * 8}px`,
-              }}
-            />
+            <div key={i} style={{
+              width: 2, borderRadius: 1, opacity: 0.65,
+              background: armed ? 'linear-gradient(to top,#00ffaa,#00eaff)' : 'linear-gradient(to top,#005f77,#00a8cc)',
+              animationName: armed ? 'wave' : 'none',
+              animationDuration: `${0.4 + i * 0.07}s`,
+              animationIterationCount: 'infinite',
+              animationDirection: 'alternate',
+              animationTimingFunction: 'ease-in-out',
+              height: `${v * 7}px`,
+            }} />
           ))}
         </div>
 
+        {/* ARM MICROPHONE button */}
         {!armed && !unlocking && (
           <button
             onClick={armMic}
             style={{
-              background: 'rgba(0,180,255,0.12)',
-              border: '1px solid rgba(0,180,255,0.6)',
-              color: '#00eaff',
-              fontSize: 11,
-              letterSpacing: 4,
-              padding: '12px 32px',
-              cursor: 'pointer',
-              borderRadius: 3,
-              fontFamily: 'monospace',
-              marginBottom: 24,
-              boxShadow: '0 0 20px rgba(0,180,255,0.2)',
-              transition: 'all 0.2s',
+              background: 'rgba(0,212,255,0.07)',
+              border: '1px solid rgba(0,212,255,0.35)',
+              color: '#00d4ff',
+              fontFamily: 'var(--font-hud)',
+              fontSize: 9, letterSpacing: 4,
+              padding: '10px 28px',
+              cursor: 'pointer', borderRadius: 3,
+              boxShadow: '0 0 18px rgba(0,212,255,0.12)',
+              transition: 'all 0.18s',
             }}
           >
             ARM MICROPHONE
           </button>
         )}
 
+        {/* Text input */}
         {!unlocking && (
           <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              checkPhrase(textInput);
-              setTextInput('');
-            }}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}
+            onSubmit={(e) => { e.preventDefault(); checkPhrase(input); setInput(''); }}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}
           >
-            <div style={{ fontSize: 9, letterSpacing: 3, color: 'rgba(0,180,255,0.35)', marginBottom: 2 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: 3, color: 'rgba(0,212,255,0.3)' }}>
               OR TYPE PASSPHRASE
             </div>
-
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
               <input
                 type="password"
-                value={textInput}
-                onChange={(e) => setTextInput(e.target.value)}
+                value={input}
+                onChange={e => setInput(e.target.value)}
                 placeholder="enter passphrase..."
                 style={{
-                  background: 'rgba(0,180,255,0.04)',
-                  border: '1px solid rgba(0,180,255,0.25)',
-                  color: '#00b4ff',
-                  padding: '8px 14px',
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                  letterSpacing: 1,
-                  outline: 'none',
-                  borderRadius: 2,
-                  width: 230,
+                  background: 'rgba(0,212,255,0.04)',
+                  border: '1px solid rgba(0,212,255,0.22)',
+                  color: '#00d4ff',
+                  padding: '8px 12px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12, letterSpacing: 1,
+                  outline: 'none', borderRadius: 2,
+                  width: 220, transition: 'border-color 0.15s',
                 }}
+                onFocus={e => { e.target.style.borderColor = 'rgba(0,212,255,0.55)'; }}
+                onBlur={e  => { e.target.style.borderColor = 'rgba(0,212,255,0.22)'; }}
               />
-              <button
-                type="submit"
-                style={{
-                  background: 'rgba(0,180,255,0.08)',
-                  border: '1px solid rgba(0,180,255,0.35)',
-                  color: '#00b4ff',
-                  padding: '8px 14px',
-                  fontFamily: 'monospace',
-                  fontSize: 10,
-                  letterSpacing: 3,
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                }}
-              >
-                ENTER
-              </button>
+              <button type="submit" style={{
+                background: 'rgba(0,212,255,0.07)',
+                border: '1px solid rgba(0,212,255,0.3)',
+                color: 'rgba(0,212,255,0.7)',
+                fontFamily: 'var(--font-hud)',
+                fontSize: 8, letterSpacing: 3,
+                padding: '8px 14px',
+                cursor: 'pointer', borderRadius: 2,
+              }}>ENTER</button>
             </div>
           </form>
         )}
       </div>
 
-      <style>{`
-        @keyframes wave {
-          from { transform: scaleY(1); }
-          to { transform: scaleY(3); }
-        }
-      `}</style>
+      <style>{`@keyframes wave { from{transform:scaleY(1)} to{transform:scaleY(3)} }`}</style>
     </div>
   );
 }
