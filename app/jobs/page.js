@@ -1,212 +1,204 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
-const defaultTitles = [
-  'Sales Manager',
-  'Sales Operations Manager',
-  'Sales Team Leader',
-  'Contact Center Manager',
-  'Contact Centre Manager',
-  'Remote Sales Manager',
-  'Telesales Manager',
-  'Outbound Sales Manager',
-  'Inside Sales Manager'
+const SUSAN = '#3dd68c';
+
+const DEFAULT_TITLES = [
+  'Sales Manager', 'Sales Operations Manager', 'Sales Team Leader',
+  'Contact Center Manager', 'Remote Sales Manager', 'Outbound Sales Manager',
 ].join('\n');
 
-const defaultExcluded = [
-  'finance',
-  'investment',
-  'real estate',
-  'car sales',
-  'automotive sales'
-].join('\n');
+const DEFAULT_EXCLUDED = ['finance', 'investment', 'real estate', 'car sales', 'automotive sales'].join('\n');
 
-function stripHtml(value) {
-  return String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+function stripHtml(v) {
+  return String(v || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export default function JobsPage() {
-  const [targetTitles, setTargetTitles] = useState(defaultTitles);
+  const [tab, setTab] = useState('search');
+  const [targetTitles, setTargetTitles] = useState(DEFAULT_TITLES);
   const [preferredLocations, setPreferredLocations] = useState('Australia\nNew Zealand');
   const [location, setLocation] = useState('');
   const [minSalary, setMinSalary] = useState('70000');
   const [remoteOnly, setRemoteOnly] = useState(true);
-  const [excludedKeywords, setExcludedKeywords] = useState(defaultExcluded);
+  const [excludedKeywords, setExcludedKeywords] = useState(DEFAULT_EXCLUDED);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [jobs, setJobs] = useState([]);
-  const [debug, setDebug] = useState(null);
+  const [applications, setApplications] = useState([]);
 
-  async function runSearch(event) {
-    event.preventDefault();
+  useEffect(() => { if (tab === 'pipeline') loadApplications(); }, [tab]);
+
+  async function loadApplications() {
+    try {
+      const res = await fetch('/api/packages');
+      const data = await res.json();
+      setApplications(data.packages || []);
+    } catch { setApplications([]); }
+  }
+
+  async function runSearch(e) {
+    e.preventDefault();
     setLoading(true);
     setError('');
     setJobs([]);
-    setDebug(null);
-
     try {
-      const response = await fetch('/api/jobs/search', {
+      const res = await fetch('/api/jobs/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          targetTitles: targetTitles.split('\n').map((x) => x.trim()).filter(Boolean),
-          preferredLocations: preferredLocations.split('\n').map((x) => x.trim()).filter(Boolean),
+          targetTitles: targetTitles.split('\n').map(x => x.trim()).filter(Boolean),
+          preferredLocations: preferredLocations.split('\n').map(x => x.trim()).filter(Boolean),
           location,
           minSalary: Number(minSalary || 0),
           remoteOnly,
-          excludedKeywords: excludedKeywords.split('\n').map((x) => x.trim()).filter(Boolean)
-        })
+          excludedKeywords: excludedKeywords.split('\n').map(x => x.trim()).filter(Boolean),
+        }),
       });
-
-      const text = await response.text();
-      let data;
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error('Server returned non-JSON response');
-      }
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'Search failed');
-      }
-
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Search failed');
       setJobs(data.jobs || []);
-      setDebug(data.debug || null);
     } catch (err) {
-      setError(err.message || 'Something went wrong');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   }
 
+  const STATUS_C = { new: '#60a5fa', applied: '#f59e0b', interview: '#c084fc', offer: '#3dd68c', rejected: '#ef4444' };
+
   return (
-    <main className="stack">
-      <section className="hero">
-        <h1>Multi-Source Job Search</h1>
-        <p>Search across multiple sources, filter aggressively, and save matched jobs into your pipeline.</p>
-      </section>
+    <div className="stack">
+      <div className="page-head">
+        <h1 style={{ color: SUSAN }}>SUSAN — Job Hunt</h1>
+        <p>Autopilot job search · multi-source scraping · fit scoring · application pipeline</p>
+      </div>
 
-      <section className="card">
-        <form onSubmit={runSearch} className="form-grid">
-          <label>
-            Target titles
-            <textarea
-              rows="8"
-              value={targetTitles}
-              onChange={(e) => setTargetTitles(e.target.value)}
-            />
-          </label>
-
-          <label>
-            Preferred locations
-            <textarea
-              rows="8"
-              value={preferredLocations}
-              onChange={(e) => setPreferredLocations(e.target.value)}
-            />
-          </label>
-
-          <label>
-            Specific location filter
-            <input
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Leave blank for broader results"
-            />
-          </label>
-
-          <label>
-            Minimum salary
-            <input
-              value={minSalary}
-              onChange={(e) => setMinSalary(e.target.value)}
-              placeholder="70000"
-            />
-          </label>
-
-          <label>
-            Excluded keywords
-            <textarea
-              rows="6"
-              value={excludedKeywords}
-              onChange={(e) => setExcludedKeywords(e.target.value)}
-            />
-          </label>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <input
-              type="checkbox"
-              checked={remoteOnly}
-              onChange={(e) => setRemoteOnly(e.target.checked)}
-            />
-            Remote only
-          </label>
-
-          <div style={{ gridColumn: '1 / -1' }}>
-            <button type="submit" disabled={loading}>
-              {loading ? 'Searching...' : 'Search live jobs'}
-            </button>
+      {/* Stats */}
+      <div className="grid">
+        {[
+          ['Results', jobs.length, 'from last search'],
+          ['Applied', applications.filter(a => a.status !== 'new').length, 'in pipeline'],
+          ['Interviews', applications.filter(a => a.status === 'interview').length, 'active'],
+          ['Offers', applications.filter(a => a.status === 'offer').length, 'received'],
+        ].map(([label, val, sub]) => (
+          <div key={label} className="card" style={{ padding: '12px 14px' }}>
+            <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: val > 0 ? SUSAN : 'var(--text-dim)' }}>{val}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{sub}</div>
           </div>
-        </form>
-      </section>
+        ))}
+      </div>
 
-      {error ? (
-        <section className="card">
-          <h2>Error</h2>
-          <p>{error}</p>
-        </section>
-      ) : null}
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+        {[['search', 'Search'], ['pipeline', 'Pipeline']].map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key)} style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '8px 16px', fontFamily: 'var(--font-mono)', fontSize: 10,
+            letterSpacing: 2, textTransform: 'uppercase',
+            color: tab === key ? SUSAN : 'var(--text-dim)',
+            borderBottom: tab === key ? `2px solid ${SUSAN}` : '2px solid transparent',
+            marginBottom: -1,
+          }}>{label}</button>
+        ))}
+      </div>
 
-      {debug ? (
-        <section className="card">
-          <h2>Debug</h2>
-          <p><strong>Enabled sources:</strong> {(debug.enabledSources || []).join(', ')}</p>
-          <p><strong>Before dedupe:</strong></p>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>
-            {JSON.stringify(debug.countsBeforeDedupe || {}, null, 2)}
-          </pre>
-          <p><strong>After filtering:</strong></p>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>
-            {JSON.stringify(debug.countsAfterFiltering || {}, null, 2)}
-          </pre>
-        </section>
-      ) : null}
+      {/* Search tab */}
+      {tab === 'search' && (
+        <div className="stack">
+          <form onSubmit={runSearch}>
+            <div className="card">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 6 }}>Target Titles</div>
+                  <textarea rows={7} value={targetTitles} onChange={e => setTargetTitles(e.target.value)}
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11, resize: 'vertical' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 6 }}>Excluded Keywords</div>
+                  <textarea rows={7} value={excludedKeywords} onChange={e => setExcludedKeywords(e.target.value)}
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11, resize: 'vertical' }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 6 }}>Preferred Locations</div>
+                  <textarea rows={3} value={preferredLocations} onChange={e => setPreferredLocations(e.target.value)}
+                    style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11, resize: 'vertical' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 6 }}>Min Salary</div>
+                    <input value={minSalary} onChange={e => setMinSalary(e.target.value)} placeholder="70000"
+                      style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11 }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, letterSpacing: 2, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: 6 }}>Location Filter</div>
+                    <input value={location} onChange={e => setLocation(e.target.value)} placeholder="Leave blank for broad"
+                      style={{ width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 11 }} />
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={remoteOnly} onChange={e => setRemoteOnly(e.target.checked)} />
+                    <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>Remote only</span>
+                  </label>
+                </div>
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <button type="submit" disabled={loading} className="btn"
+                  style={{ background: SUSAN, border: 'none', color: '#000', fontWeight: 700, padding: '10px 24px' }}>
+                  {loading ? 'Scanning sources...' : 'Run SUSAN'}
+                </button>
+              </div>
+            </div>
+          </form>
 
-      <section className="card">
-        <h2>Results</h2>
-        {!jobs.length ? (
-          <p>No jobs loaded yet.</p>
-        ) : (
-          <div style={{ display: 'grid', gap: '12px' }}>
-            {jobs.map((job) => (
-              <article
-                key={`${job.source}-${job.external_id}`}
-                style={{ border: '1px solid #ddd', borderRadius: '10px', padding: '14px' }}
-              >
-                <h3>{job.title}</h3>
-                <p><strong>Company:</strong> {job.company}</p>
-                <p><strong>Location:</strong> {job.location}</p>
-                <p><strong>Source:</strong> {job.source}</p>
-                <p><strong>Fit score:</strong> {job.fit_score}</p>
-                <p><strong>Matched title:</strong> {job.matched_title || 'None'}</p>
-                <p><strong>Salary:</strong> {job.salary_text || 'Not listed'}</p>
-                <p><strong>Remote:</strong> {job.remote ? 'Yes' : 'No'}</p>
-                <p style={{ whiteSpace: 'pre-wrap' }}>
-                  {stripHtml(job.description).slice(0, 500)}
-                  {stripHtml(job.description).length > 500 ? '...' : ''}
-                </p>
-                {job.apply_url ? (
-                  <a href={job.apply_url} target="_blank" rel="noreferrer">
-                    Open job
-                  </a>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
+          {error && <div className="card" style={{ borderColor: '#ef4444', color: '#ef4444', fontSize: 13 }}>{error}</div>}
+
+          {jobs.length > 0 && (
+            <div className="stack">
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: 3, color: 'var(--text-dim)', textTransform: 'uppercase' }}>{jobs.length} results</div>
+              {jobs.map(job => (
+                <div key={`${job.source}-${job.external_id}`} className="card" style={{ borderLeft: `3px solid ${job.fit_score >= 80 ? SUSAN : job.fit_score >= 60 ? '#f59e0b' : 'var(--border)'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{job.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>{job.company} · {job.location} · {job.remote ? 'Remote' : 'On-site'}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{stripHtml(job.description).slice(0, 300)}{stripHtml(job.description).length > 300 ? '...' : ''}</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
+                      <span className="badge" style={{ color: job.fit_score >= 80 ? SUSAN : '#f59e0b', borderColor: 'currentColor' }}>
+                        {job.fit_score}% fit
+                      </span>
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{job.source}</span>
+                      {job.apply_url && (
+                        <a href={job.apply_url} target="_blank" rel="noreferrer" className="btn" style={{ fontSize: 10, padding: '4px 10px' }}>Apply →</a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pipeline tab */}
+      {tab === 'pipeline' && (
+        <div className="stack">
+          {applications.length === 0 && <div className="card" style={{ color: 'var(--text-dim)', fontSize: 13 }}>No applications in pipeline yet.</div>}
+          {applications.map(a => (
+            <div key={a.id} className="card" style={{ borderLeft: `3px solid ${STATUS_C[a.status] || 'var(--border)'}` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{a.jobTitle || a.job_title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{a.company}</div>
+                </div>
+                <span className="badge" style={{ color: STATUS_C[a.status] || 'var(--text-dim)', borderColor: 'currentColor' }}>{a.status}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
