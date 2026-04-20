@@ -15,7 +15,8 @@ export async function GET(request) {
   if (!client) return NextResponse.json({ tasks: [], mock: true });
   const url = new URL(request.url);
   const status = url.searchParams.get('status');
-  let q = client.from('friday_tasks').select('*').order('created_at', { ascending: false });
+  const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+  let q = client.from('friday_tasks').select('*').order('created_at', { ascending: false }).limit(limit);
   if (status) q = q.eq('status', status);
   const { data, error } = await q;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

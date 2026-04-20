@@ -23,7 +23,8 @@ const NAV_GROUPS = [
     heading: 'JOB HUNT',
     links: [
       { href: '/jobs',         label: 'Job Hunt',     hint: 'SUSAN · autopilot',  icon: '◎', colour: '#3dd68c' },
-      { href: '/brain',        label: 'Brain',        hint: 'Neural debug',       icon: '⬡', colour: '#c084fc' },
+      { href: '/packages',     label: 'Packages',     hint: 'Application vault',  icon: '◧', colour: '#3dd68c' },
+      { href: '/brain',        label: 'Brain',        hint: 'MAYA · job analysis',icon: '⬡', colour: '#c084fc' },
       { href: '/teleprompter', label: 'Teleprompter', hint: 'Script overlay',     icon: '▤', colour: '#ff6b35' },
       { href: '/settings',     label: 'Config',       hint: 'Keys + integrations',icon: '⚙', colour: '#4a6080' },
     ],

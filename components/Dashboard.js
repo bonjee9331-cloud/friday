@@ -201,7 +201,7 @@ function JobMatchesWidget() {
 function TasksWidget() {
   const [tasks, setTasks] = useState([]);
   useEffect(() => {
-    authedFetch('/api/tasks?limit=5').then(r => r.json())
+    authedFetch('/api/friday/tasks?limit=5').then(r => r.json())
       .then(d => setTasks(Array.isArray(d?.tasks) ? d.tasks : [])).catch(() => {});
   }, []);
   const STATUS_C = { queued: '#60a5fa', running: '#f59e0b', done: '#3dd68c', blocked: '#ef4444', void: 'rgba(0,212,255,0.25)' };
