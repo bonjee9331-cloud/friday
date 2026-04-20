@@ -16,21 +16,16 @@ const NAV_GROUPS = [
     links: [
       { href: '/bob',   label: 'Sales Ops',   hint: 'RILEY · floor monitor',  icon: '◉', colour: '#f59e0b' },
       { href: '/s3',    label: 'S3 Content',  hint: 'Savage Sales School',     icon: '▲', colour: '#D4352C' },
-      { href: '/jobs',  label: 'Job Hunt',    hint: 'SUSAN · autopilot',       icon: '◎', colour: '#3dd68c' },
       { href: '/tasks', label: 'Tasks',       hint: 'DOUG · daily runner',     icon: '▦', colour: '#60a5fa' },
     ],
   },
   {
-    heading: 'TOOLS',
+    heading: 'JOB HUNT',
     links: [
-      { href: '/brain',         label: 'Brain',         hint: 'Neural debug',      icon: '⬡', colour: '#c084fc' },
-      { href: '/teleprompter',  label: 'Teleprompter',  hint: 'Script overlay',    icon: '▤', colour: '#ff6b35' },
-    ],
-  },
-  {
-    heading: 'SYSTEM',
-    links: [
-      { href: '/settings', label: 'Config', hint: 'Keys + integrations', icon: '⚙', colour: '#4a6080' },
+      { href: '/jobs',         label: 'Job Hunt',     hint: 'SUSAN · autopilot',  icon: '◎', colour: '#3dd68c' },
+      { href: '/brain',        label: 'Brain',        hint: 'Neural debug',       icon: '⬡', colour: '#c084fc' },
+      { href: '/teleprompter', label: 'Teleprompter', hint: 'Script overlay',     icon: '▤', colour: '#ff6b35' },
+      { href: '/settings',     label: 'Config',       hint: 'Keys + integrations',icon: '⚙', colour: '#4a6080' },
     ],
   },
 ];
