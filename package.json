@@ -10,6 +10,7 @@
     "check:syntax": "node scripts/check-syntax.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@supabase/supabase-js": "^2.49.8",
     "next": "^16.2.4",
     "react": "18.3.1",
