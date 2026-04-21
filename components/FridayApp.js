@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import AppErrorBoundary from './AppErrorBoundary';
 
@@ -10,10 +10,29 @@ const Dashboard    = dynamic(() => import('./Dashboard'),    { ssr: false });
 const ChatUI       = dynamic(() => import('./ChatUI'),       { ssr: false });
 
 export default function FridayApp() {
+  // If session cookie exists (set by /api/auth/login), skip lock screen.
+  // We detect this by pinging a protected endpoint — if it returns 200, we're in.
   const [appState, setAppState] = useState(() => {
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('friday_booted')) return 'ready';
     return 'locked';
   });
+
+  // On mount: silently validate session — skip lock if already authenticated
+  useEffect(() => {
+    if (appState !== 'locked') return;
+    fetch('/api/health', { method: 'GET' })
+      .then(r => {
+        if (r.ok) {
+          // Session cookie is valid — go straight to app
+          if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('friday_booted')) {
+            setAppState('ready');
+          } else {
+            setAppState('booting');
+          }
+        }
+      })
+      .catch(() => {}); // Stay on lock screen if request fails
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleUnlock = useCallback(() => {
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('friday_booted')) {

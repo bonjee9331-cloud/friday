@@ -47,17 +47,26 @@ export default function LockScreen({ onUnlock }) {
     setTimeout(onUnlock, 1800);
   }, [onUnlock, unlocking]);
 
-  const checkPhrase = useCallback((txt) => {
-    if (typeof txt !== 'string') return;
-    const t = txt.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
-    if (
-      t.includes('lets get biblical') ||
-      t.includes("let s get biblical") ||
-      t.includes('let us get biblical') ||
-      t.includes('get biblical') ||
-      t.includes('biblical')
-    ) doUnlock();
-  }, [doUnlock]);
+  const checkPhrase = useCallback(async (txt) => {
+    if (typeof txt !== 'string' || unlocking) return;
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: txt }),
+      });
+      if (res.ok) {
+        doUnlock();
+      } else {
+        setStatus('ACCESS DENIED — TRY AGAIN');
+        setTimeout(() => setStatus(armed ? 'LISTENING — SPEAK PASSPHRASE' : 'AUTHENTICATION REQUIRED'), 2000);
+      }
+    } catch {
+      // Fallback: allow if server unreachable (dev mode)
+      const t = txt.toLowerCase().replace(/[^a-z\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (t.includes('biblical')) doUnlock();
+    }
+  }, [doUnlock, unlocking, armed]);
 
   const armMic = useCallback(() => {
     if (typeof window === 'undefined') return;
