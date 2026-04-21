@@ -12,10 +12,7 @@ const ChatUI       = dynamic(() => import('./ChatUI'),       { ssr: false });
 export default function FridayApp() {
   // If session cookie exists (set by /api/auth/login), skip lock screen.
   // We detect this by pinging a protected endpoint — if it returns 200, we're in.
-  const [appState, setAppState] = useState(() => {
-    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('friday_booted')) return 'ready';
-    return 'locked';
-  });
+  const [appState, setAppState] = useState('locked');
 
   // On mount: silently validate session — skip lock if already authenticated
   useEffect(() => {

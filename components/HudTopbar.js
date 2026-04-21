@@ -11,7 +11,7 @@ const AGENTS = [
   { key: 'MAYA',  colour: '#c084fc' },
 ];
 
-export default function HudTopbar({ mode, onModeChange }) {
+export default function HudTopbar({ mode, onModeChange, godsEyeActive, onGodsEyeToggle }) {
   const path = usePathname();
   const [time, setTime] = useState('');
   const [date, setDate] = useState('');
@@ -87,6 +87,40 @@ export default function HudTopbar({ mode, onModeChange }) {
       )}
 
       <div style={{ flex: 1 }} />
+
+      {/* ── GODS EYE button ── */}
+      <button
+        onClick={onGodsEyeToggle}
+        title="Gods Eye — World Monitor"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          background: godsEyeActive ? 'rgba(255,48,48,0.18)' : 'rgba(255,48,48,0.06)',
+          border: godsEyeActive ? '1px solid rgba(255,48,48,0.6)' : '1px solid rgba(255,48,48,0.2)',
+          borderRadius: 4,
+          padding: '5px 12px',
+          cursor: 'pointer',
+          marginRight: 14,
+          transition: 'all 0.14s',
+          flexShrink: 0,
+        }}
+        onMouseEnter={e => { if (!godsEyeActive) e.currentTarget.style.background = 'rgba(255,48,48,0.14)'; }}
+        onMouseLeave={e => { if (!godsEyeActive) e.currentTarget.style.background = 'rgba(255,48,48,0.06)'; }}
+      >
+        <span style={{
+          width: 6, height: 6, borderRadius: '50%',
+          background: godsEyeActive ? '#ff3030' : 'rgba(255,48,48,0.5)',
+          boxShadow: godsEyeActive ? '0 0 8px #ff3030' : 'none',
+          animation: godsEyeActive ? 'pulse-dot 0.9s ease-in-out infinite' : 'none',
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontFamily: 'var(--font-hud)', fontSize: 7.5, letterSpacing: 2.5,
+          color: godsEyeActive ? '#ff3030' : 'rgba(255,48,48,0.55)',
+          textShadow: godsEyeActive ? '0 0 12px rgba(255,48,48,0.6)' : 'none',
+        }}>
+          {godsEyeActive ? '◉ GODS EYE' : '◎ GODS EYE'}
+        </span>
+      </button>
 
       {/* Agent dots */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginRight: 14 }}>
